@@ -1,6 +1,6 @@
-# ASCOS - AI Software Company OS
+# ASCOS — AI Software Company Skill
 
-> A reusable collaboration framework for AI coding assistants. It orchestrates a single coding model into a dynamically coordinated software company that can plan, challenge, design, implement, review, test, deploy and improve software — instead of merely generating code.
+> A software-development orchestration skill that turns incomplete user requirements into production-ready solutions through dynamic expert-role switching, first-principles reasoning, adversarial review, enterprise engineering standards, automated testing, review, and risk analysis.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-1.0.0-green.svg)](ascos.json)
@@ -24,22 +24,22 @@
 
 ## What is this
 
-ASCOS (**AI Software Company OS**) is not a full software framework, nor a system of dozens of independently running agents. Its positioning is a **senior software-development orchestration skill (Skill)** that does one thing well:
+ASCOS (**AI Software Company Skill**) is not an OS, not a framework of dozens of independently running agents, and not a heavyweight orchestration platform. Its positioning is a **senior software-development orchestration skill (Skill)** that does one thing well:
 
 > Turn the user's *incomplete development requirement* into a complete, enterprise-grade software engineering workflow.
 
-It codifies a proven engineering methodology into `SKILL.md`, and provides supporting engines, expert-role guidance, standards and document templates under `core/`, `departments/`, `standards/` and `templates/`. It is loaded and executed by AI coding assistants such as Codex.
+It codifies a proven engineering methodology into `SKILL.md`, with supporting reference modules under `references/` and document templates under `templates/`. It is loaded and executed by AI coding assistants such as Codex.
 
-**Key point**: ASCOS does **not** require every task to use every role. The Dispatcher selects only the expertise the current task actually needs — small tasks stay small, complex tasks are handled comprehensively.
+**Key point**: ASCOS does **not** require every task to use every role. It switches only the expertise the current task actually needs — small tasks stay small, complex tasks are handled comprehensively. It also deliberately avoids overengineering: a simple requirement is never silently expanded into microservices, Redis, MQ, or Kubernetes.
 
 ---
 
 ## Core features
 
 - **Requirements are incomplete by default — AI fills the gaps**: proactively considers boundaries, exceptions, permissions, security, performance and observability the user did not mention, instead of asking question after question.
-- **Dynamic expert perspective switching**: automatically shifts between Product / Architect / Frontend / Backend / Database / Security / QA / DevOps / CTO viewpoints per task — changing *how to think*, not spinning up a swarm of agents.
+- **Dynamic expert perspective switching**: automatically shifts between Product / Architect / Frontend / Backend / Database / AI / Security / QA / DevOps / CTO viewpoints per task — changing *how to think*, not spinning up a swarm of agents.
 - **Enterprise engineering standards enforced**: interface-contract-first, unified error codes, business/IO separation, input validation, idempotency, transactions, concurrency handling, parameterized queries, server-side authN/authZ — all built in.
-- **A closed loop, not "code then done"**: after implementation it must pass testing, Code Review, a quality gate and CTO review, and ship a remaining-risk list.
+- **A closed loop, not "code then done"**: after implementation it must pass systematic testing, Code Review, pre-completion verification, a quality gate and CTO review, and ship a remaining-risk list.
 - **Anti-overengineering**: prefer the simple solution; any new infrastructure (queue / cache / microservice / Kubernetes / vector DB) must state its benefit *and* cost.
 
 ---
@@ -48,17 +48,22 @@ It codifies a proven engineering methodology into `SKILL.md`, and provides suppo
 
 ```text
 User intent
-  -> Planner
+  -> Repository awareness (existing project)
+  -> Requirement completeness check
   -> First-principles analysis
   -> Adversarial review
-  -> Decision Engine
-  -> Dynamic Dispatcher (selects the necessary roles)
-  -> Expert execution
-  -> Review
-  -> Quality Gate
-  -> CTO review
-  -> Delivery
-  -> Retrospective
+  -> Requirement completion
+  -> Change-impact analysis
+  -> Dynamic role selection
+  -> Architecture / design / implementation
+  -> Testing / systematic debugging
+  -> Security review
+  -> Code review
+  -> Pre-completion verification (real build/test evidence)
+  -> Quality gate
+  -> Release / migration / rollback check (if deploying)
+  -> CTO final review
+  -> Delivery + risk list
 ```
 
 Increased internal rigor should raise **output quality**, not **answer length**.
@@ -67,10 +72,10 @@ Increased internal rigor should raise **output quality**, not **answer length**.
 
 ## Installation
 
-Clone (or copy) this repository into your Codex skills directory:
+Clone this repository into your Codex skills directory:
 
 ```bash
-git clone https://github.com/watermelon-dev-609/ASCOS-v1.0.git ~/.codex/skills/ai-software-company-os
+git clone https://github.com/watermelon-dev-609/ASCOS-v1.0.git ~/.codex/skills/ai-software-company-skill
 ```
 
 Restart Codex after installation if the skill does not appear immediately.
@@ -82,10 +87,10 @@ Restart Codex after installation if the skill does not appear immediately.
 Invoke the skill when you want Codex to handle software work with a full engineering workflow:
 
 ```text
-Use $ai-software-company-os to plan, implement, test and review this software task.
+Use $ai-software-company-skill to plan, implement, test and review this software task.
 ```
 
-For tool-specific integration, see the [`integrations/`](integrations/) directory.
+The skill is tool-agnostic: the `SKILL.md` contract works the same in Codex, Cursor, Claude Code, or any agent that loads Markdown-based skills.
 
 ---
 
@@ -93,15 +98,13 @@ For tool-specific integration, see the [`integrations/`](integrations/) director
 
 | Path | Description |
 |------|-------------|
-| `SKILL.md` | Canonical skill entry point and instructions (core file) |
+| `SKILL.md` | Canonical skill entry point and 17-step workflow (core file) |
 | `agents/` | Codex UI metadata |
-| `core/` | Planning, dispatch, decision, review, quality and learning engines |
-| `departments/` | Dynamically selected expert-role guidance |
-| `standards/` | Coding, security, API, database, frontend, backend, testing, deployment rules |
-| `templates/` | PRD, ADR, RFC, API, test and release templates |
-| `checklists/` | Concise gates for fast execution |
-| `integrations/` | Tool-specific adapters |
-| `examples/` | Examples of how ASCOS should behave |
+| `references/` | Role, architecture, frontend, backend, database, security, testing, quality-gate, repository-awareness, change-impact, verification, debugging, definition-of-done and more reference modules |
+| `templates/` | PRD, ADR, API_SPEC, TEST_PLAN document templates |
+| `ascos.json` | Skill metadata |
+| `AGENTS.md` | Agent entry-point guidance |
+| `CHANGELOG.md` | Change history |
 
 ---
 
@@ -134,6 +137,7 @@ ASCOS enforces the following principles during development and review:
 - Feature / page / API development
 - Architecture design and technology selection
 - Bug fixing and code refactoring
+- RAG / AI-feature development
 - Deployment and DevOps
 - Product planning and technical review
 - Production-readiness work

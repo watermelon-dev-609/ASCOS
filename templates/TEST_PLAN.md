@@ -1,12 +1,21 @@
-# Test Plan
+# 测试计划
 
-## Scope
-## Critical behaviors
-## Happy paths
-## Boundaries
-## Invalid input
-## Permission tests
-## Failure injection
-## Concurrency/retry tests
-## Performance checks
-## Regression risks
+## 范围
+- 被测对象：
+- 测试类型：单元 / 集成 / 端到端
+
+## 环境
+- 依赖 / 数据 / 配置
+
+## 用例矩阵
+| 编号 | 场景 | 类型(正常/边界/异常) | 前置 | 操作 | 期望结果 |
+|------|------|----------------------|------|------|----------|
+| TC-01 |      | 正常                 |      |      |          |
+| TC-02 |      | 边界                 |      |      |          |
+| TC-03 |      | 异常                 |      |      |          |
+
+## 安全专项
+- 鉴权 / 授权 / 注入 / XSS / 越权 / 并发 用例
+
+## 通过标准
+- 全部正常 + 边界通过；异常用例有明确预期（拒绝 / 降级）。

@@ -1,14 +1,20 @@
-# API Specification
+# API 规范
 
-## Endpoint
-Method / Path
+## 统一响应契约
+```json
+{ "ok": true, "code": 0, "msg": "", "data": {} }
+```
 
-## Authentication
-## Authorization
-## Request
-## Validation
-## Response
-## Error codes
-## Idempotency
-## Rate limits
-## Examples
+## 接口清单
+### `POST /api/...`
+- 描述：
+- 鉴权：需要 / 不需要
+- 权限：<角色 / 资源级>
+- 请求参数（校验规则）：
+  | 字段 | 类型 | 必填 | 校验 |
+  |------|------|------|------|
+  |      |      |      |      |
+- 成功响应：
+- 错误码：
+- 幂等：是否 / 幂等键字段
+- 异常场景：非法输入 / 越权 / 并发冲突

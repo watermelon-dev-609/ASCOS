@@ -1,21 +1,20 @@
 {
-  "name": "ai-software-company-os",
-  "display_name": "AI Software Company OS",
+  "name": "ai-software-company-skill",
+  "display_name": "AI Software Company Skill",
   "version": "1.0.0",
   "entrypoint": "SKILL.md",
   "license": "MIT",
-  "description": "Dynamic multi-role software engineering operating framework for AI coding assistants.",
+  "description": "A software-development orchestration skill that turns incomplete user requirements into production-ready solutions through dynamic expert-role switching, first-principles reasoning, adversarial review, enterprise engineering standards, automated testing, review, and risk analysis.",
   "capabilities": [
-    "planning",
     "requirements-completion",
     "architecture",
     "frontend",
     "backend",
     "database",
+    "ai-engineering",
     "security",
     "testing",
     "devops",
-    "ai-engineering",
     "review"
   ]
 }

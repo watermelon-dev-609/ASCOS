@@ -1,7 +1,7 @@
 interface:
-  display_name: "ASCOS"
+  display_name: "AI Software Company Skill"
   short_description: "Production-minded software engineering workflow for Codex."
-  default_prompt: "Use $ai-software-company-os to plan, implement, test and review this software task."
+  default_prompt: "Use $ai-software-company-skill to plan, implement, test and review this software task."
 
 policy:
   allow_implicit_invocation: true

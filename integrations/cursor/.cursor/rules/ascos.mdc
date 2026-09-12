@@ -1,9 +1,0 @@
----
-description: ASCOS enterprise software engineering workflow
-alwaysApply: true
----
-
-Read the repository ASCOS SKILL.md.
-Treat user requirements as potentially incomplete.
-Use first-principles analysis, adversarial review, proportionate architecture, tests and risk review.
-Never rely on frontend-only authorization.
