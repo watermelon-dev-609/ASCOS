@@ -1,0 +1,21 @@
+{
+  "name": "ai-software-company-os",
+  "display_name": "AI Software Company OS",
+  "version": "1.0.0",
+  "entrypoint": "SKILL.md",
+  "license": "MIT",
+  "description": "Dynamic multi-role software engineering operating framework for AI coding assistants.",
+  "capabilities": [
+    "planning",
+    "requirements-completion",
+    "architecture",
+    "frontend",
+    "backend",
+    "database",
+    "security",
+    "testing",
+    "devops",
+    "ai-engineering",
+    "review"
+  ]
+}
