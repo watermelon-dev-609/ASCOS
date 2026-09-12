@@ -1,64 +1,153 @@
-# ASCOS - AI Software Company OS
+# ASCOS - AI 软件公司操作系统
 
-ASCOS is a reusable operating framework for AI coding assistants. It turns a single coding model into a dynamically coordinated software company that can plan, challenge, design, implement, review, test, deploy and improve software instead of merely generating code.
+> 一个可复用的 AI 编程助手协作框架。它把单一的编码模型"编排"成一家动态协作的软件公司，能够规划、质疑、设计、实现、审查、测试、部署并持续改进软件，而不只是生成代码。
 
-## What this repository contains
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-1.0.0-green.svg)](ascos.json)
 
-This repository packages ASCOS as a Codex-compatible skill. The canonical skill entry point is `SKILL.md`; the supporting folders contain role guidance, engineering standards, checklists, examples and tool-specific integration prompts.
+---
 
-## Core idea
+## 目录
 
-User intent -> Planner -> First-principles analysis -> Adversarial review -> Decision Engine -> Dynamic Dispatcher -> Expert execution -> Review -> Quality Gate -> CTO review -> Delivery -> Retrospective.
+- [这是什么](#这是什么)
+- [核心特性](#核心特性)
+- [工作流](#工作流)
+- [安装](#安装)
+- [使用方式](#使用方式)
+- [项目结构](#项目结构)
+- [工程规范](#工程规范)
+- [设计原则](#设计原则)
+- [适用场景](#适用场景)
+- [许可证](#许可证)
 
-ASCOS does **not** require every task to use every role. The dispatcher selects only the expertise necessary for the current task.
+---
 
-## Design goals
+## 这是什么
 
-- Complete the user's objective, not merely the literal request.
-- Treat requirements as incomplete by default and responsibly fill gaps.
-- Prefer simple, maintainable solutions over fashionable complexity.
-- Make assumptions explicit.
-- Separate facts, assumptions, recommendations and trade-offs.
-- Apply enterprise-grade security, testing, observability and documentation where they are proportionate.
-- Avoid overengineering through KISS, DRY and YAGNI.
-- Challenge unsafe or weak technical decisions rather than blindly complying.
+ASCOS（**AI Software Company OS**）不是一个完整的软件框架，也不是几十个独立运行的 Agent 系统。它的定位是一个**高级软件开发总控技能（Skill）**，主要做一件事：
 
-## Installation for Codex
+> 把用户"不完整的开发需求"，自动升级为一整套企业级软件工程闭环。
 
-Clone or copy this repository into your Codex skills directory:
+它把一套经过验证的工程方法论固化进 `SKILL.md`，并在 `core/`、`departments/`、`standards/`、`templates/` 中提供配套的引擎、专家角色指引、规范与文档模板。底层由 Codex 等 AI 编程助手加载执行。
+
+**关键点**：ASCOS **不会**要求每个任务都用上所有角色。调度器（Dispatcher）只会挑选当前任务真正需要的专家视角，小任务保持小，复杂任务才彻底处理。
+
+---
+
+## 核心特性
+
+- **需求默认不完整，AI 主动补全**：自动想到用户没说的边界、异常、权限、安全、性能与可观测性，而非逐条追问。
+- **动态专家视角切换**：按任务自动切换产品 / 架构 / 前端 / 后端 / 数据库 / 安全 / 测试 / DevOps / CTO 等视角，是"换思路"而非"拉起一堆 Agent"。
+- **企业级工程规范强制化**：接口契约先行、统一错误码、业务与 IO 分离、输入校验、幂等、事务、并发竞态、参数化查询、鉴权授权等标准内建。
+- **闭环而非写完即结束**：编码后必须经过测试、Code Review、质量门禁、CTO 检查，并输出剩余风险清单。
+- **反过度设计**：能简单解决就不复杂解决；任何新增基础设施（队列 / 缓存 / 微服务 / K8s / 向量库）都必须说明收益与成本。
+
+---
+
+## 工作流
+
+```text
+用户意图
+  → 规划（Planner）
+  → 第一性原理分析
+  → 对抗性审查
+  → 决策引擎
+  → 动态调度（Dispatcher 选择必要角色）
+  → 专家执行
+  → 审查（Review）
+  → 质量门禁（Quality Gate）
+  → CTO 评审
+  → 交付
+  → 复盘（Retrospective）
+```
+
+内部严谨度的提升，应当提升**产出质量**，而不是拉长**回答篇幅**。
+
+---
+
+## 安装
+
+将本仓库克隆（或复制）到你的 Codex 技能目录：
 
 ```bash
 git clone https://github.com/watermelon-dev-609/ASCOS-v1.0.git ~/.codex/skills/ai-software-company-os
 ```
 
-Restart Codex after installation if the skill does not appear immediately.
+安装后若技能未立即出现，重启 Codex 即可。
 
-## Usage
+---
 
-Invoke the skill when you want Codex to handle software work with a full engineering workflow:
+## 使用方式
+
+当你希望 Codex 以完整的工程工作流来处理软件任务时，调用该技能：
 
 ```text
 Use $ai-software-company-os to plan, implement, test and review this software task.
 ```
 
-For specific tools, see `integrations/`.
+针对特定工具的接入方式，请参阅 [`integrations/`](integrations/) 目录。
 
-## Project structure
+---
 
-- `SKILL.md` - canonical Codex skill instructions.
-- `agents/` - Codex UI metadata.
-- `core/` - planning, dispatch, decision, review, quality and learning engines.
-- `departments/` - dynamically selected expert roles.
-- `standards/` - coding, security, API, DB, frontend, backend, testing and deployment rules.
-- `templates/` - PRD, ADR, RFC, API, test and release templates.
-- `checklists/` - concise gates for fast execution.
-- `integrations/` - tool-specific adapters.
-- `examples/` - examples of how ASCOS should behave.
+## 项目结构
 
-## Operating principle
+| 路径 | 说明 |
+|------|------|
+| `SKILL.md` | 技能的主入口与规范说明（核心文件） |
+| `agents/` | Codex UI 元数据 |
+| `core/` | 规划、调度、决策、审查、质量与学习引擎 |
+| `departments/` | 动态选择的专家角色指引 |
+| `standards/` | 编码、安全、API、数据库、前端、后端、测试、部署等规范 |
+| `templates/` | PRD、ADR、RFC、API、测试、发布等模板 |
+| `checklists/` | 用于快速执行的精简门禁清单 |
+| `integrations/` | 面向特定工具的适配指引 |
+| `examples/` | ASCOS 应有的行为规范示例 |
 
-ASCOS is a framework, not a reason to produce huge answers. Internal rigor should increase output quality, not output length. Small tasks should remain small. Complex tasks should be handled comprehensively.
+---
 
-## Version
+## 工程规范
 
-v1.0.0
+ASCOS 在开发与审查中强制执行以下原则：
+
+- **设计**：高内聚低耦合、单一职责（SRP）、KISS、DRY、YAGNI；接口契约先行。
+- **后端**：分层架构、统一错误码、业务与 IO 分离、所有外部输入校验、幂等、事务回滚、并发竞态处理、参数化查询防注入、服务端鉴权与授权。
+- **前端**：基础组件与业务组件分离、Design Token 统一样式、加载 / 空 / 报错 / 无权限四态、表单校验、防重复提交、ESC 关闭弹窗、XSS 防护、资源自动释放。
+- **安全**：默认拒绝、对象级鉴权、注入 / XSS 防护、越权（IDOR）防护、日志脱敏、密钥走环境变量（禁止硬编码）。
+- **测试**：正常 / 边界 / 异常三类场景覆盖，关键路径必须有针对性用例。
+
+---
+
+## 设计原则
+
+1. 完成用户的**目标**，而非仅执行字面请求。
+2. 把需求视为默认不完整，并负责任地补全缺口。
+3. 优先简单、可维护的方案，而非追时髦的复杂度。
+4. 显式标明假设，区分事实、假设、建议与权衡。
+5. 在适度范围内应用企业级的安全、测试、可观测与文档规范。
+6. 通过 KISS / DRY / YAGNI 避免过度设计。
+7. 对不安全或薄弱的技术决策提出质疑，而不是盲从。
+
+---
+
+## 适用场景
+
+- 功能 / 页面 / API 开发
+- 架构设计、技术选型
+- Bug 修复、代码重构
+- 部署上线、DevOps
+- 产品规划、技术评审
+- 生产就绪（Production Readiness）建设
+
+---
+
+## 许可证
+
+本项目基于 [MIT 许可证](LICENSE) 开源。
+
+---
+
+## 版本
+
+当前版本：**v1.0.0**
+
+详见 [`CHANGELOG.md`](CHANGELOG.md) 了解变更历史。
