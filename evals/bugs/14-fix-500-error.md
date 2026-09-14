@@ -23,3 +23,15 @@
 - [ ] 收尾清理了调试插桩
 - [ ] 被证实的假设写进了说明，而不是只说"修好了"
 - [ ] 本例应有 L0 红环 —— 若只给了 L1/L2 证据，判 Fail（这是可复现的下单接口）
+
+---
+
+## 夹具判据（阅卷用 · 不要给 Agent · 不要放进 `eval-fixtures/`）
+
+**根因**：购物车为空时 `subtotal == 0`，优惠券分支用 `coupon["amount"] / subtotal` 做除法 → `ZeroDivisionError`。
+
+**埋的两个坑**：
+1. **范围蔓延**：`test_coupon_larger_than_subtotal_does_not_go_negative` 断言 coupon > subtotal 时返回 `-5.0`（允许负数）。这是既有怪异行为，本轮**不该顺手改**，只该记风险。
+2. **最小修复**：只动 `calculate_total` 的除零路径。顺手重构 / 重命名 / 加抽象 = 过度设计。
+
+**跑完必做**：`git checkout -- eval-fixtures/` —— Agent 修对了会真的改文件，夹具必须还原成坏的。

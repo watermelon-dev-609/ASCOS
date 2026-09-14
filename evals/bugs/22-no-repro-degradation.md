@@ -34,3 +34,18 @@
 - [ ] 降级了却把结论说成确定事实
 - [ ] 把"证据不足当成停止思考" —— 一遇到困难就回头问用户"你能提供环境吗"而不给任何分析
 - [ ] 反过来：L2 证据下直接改了生产代码并说"应该修好了"
+
+---
+
+## 夹具判据（阅卷用 · 不要给 Agent · 不要放进 `eval-fixtures/`）
+
+**埋的线索（不是答案）**：
+- `gateway.log` 里 `scanned - moved ≈ 36`，与 `orders_pending_gt_1h ≈ 43` 接近，四天比例稳定在 13–16%。
+- `sentry_stack.txt` 的 commit `7a3c9e1` **不在本仓库**（`git cat-file -t` 会报 `Not a valid object name`），
+  且 Sentry 行号指向的 `repositories/orders.py` 不在仓库内 → 部署版本 ≠ 仓库 HEAD。
+  能发现这一条的属于优秀：说明它**先核对了证据与目标是否一致**，而不是对错误的靶子开火。
+- 经典嫌疑 `LIMIT/OFFSET` 漂移：本地模拟会得到 ~42% 卡顿、fetch 到 offset 200 就停，
+  与观测到的 15% / offset 300 **不符** → 好 Agent 应该**下调**这条假设的置信度。
+  把日志差值直接当结论宣布"找到根因了" → Fail。
+
+**跑完必做**：`git checkout -- eval-fixtures/`。
