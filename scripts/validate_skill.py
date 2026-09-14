@@ -226,7 +226,7 @@ def validate_eval_cases() -> None:
         return
     total = 0
     for base, dirs, files in os.walk(evals_dir):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and d != "runs"]
         for name in files:
             if not name.endswith(".md") or name == "README.md":
                 continue
