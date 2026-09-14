@@ -32,10 +32,37 @@ SKIP_DIRS = {"node_modules", "eval-fixtures"}
 FINDINGS: list[tuple[str, str]] = []
 CHECKS: list[str] = []
 
-MAX_ROOT_SKILL_LINES = 220
+MAX_ROOT_SKILL_LINES = 160  # root holds only trigger/classify/route/accept; new knowledge goes to skills/ or references/
 MAX_SKILL_LINES = 260
 MAX_REFERENCE_LINES = 140
 MIN_DESCRIPTION_CHARS = 40
+
+# --- Rule Drift Detection --------------------------------------------------
+# Structural checks answer "is the file there?" but not "does this rule exist
+# in two versions?". Both P0s in the v1.1.1 review were drift, not gaps:
+#   - the root debugging contract still said "no red loop -> stop" while
+#     skills/debugging had moved to an explicit evidence ladder
+#   - verification restated a risk-list rule that non-negotiables.md owns
+# So the validator now guards both classes.
+SOLE_SOURCE_RULES = [
+    {
+        "owner": "non-negotiables.md",
+        "rule": "第 2 条 · 剩余风险清单",
+        # A file *restates* the rule only when every marker co-occurs.
+        # A mere reference ("见 non-negotiables.md 第 2 条") never trips it.
+        "markers": ["越权 / 未授权访问", "并发竞态", "依赖与供应链"],
+    },
+]
+
+# Drift that already happened once; guarded so it cannot silently come back.
+FORBIDDEN_DRIFT = [
+    {
+        "path": "SKILL.md",
+        "phrase": "无法构建能变红的反馈环",
+        "message": "root contract contradicts the evidence ladder in skills/debugging: "
+                   "when L0 is unavailable it must degrade explicitly, not stop",
+    },
+]
 
 
 def check(ok: bool, label: str, detail: str = "", level: str = "error") -> bool:
@@ -255,6 +282,31 @@ def validate_duplicate_rules() -> None:
           level="warn")
 
 
+def validate_rule_drift() -> None:
+    """Catch a rule living in two places, or two versions of the same rule."""
+    for rule in SOLE_SOURCE_RULES:
+        owner = os.path.join(REFS_DIR, rule["owner"])
+        if not os.path.isfile(owner):
+            continue
+        owner_abs = os.path.abspath(owner)
+        offenders = [
+            rel(path) for path in markdown_files()
+            if os.path.abspath(path) != owner_abs
+            and all(marker in read_text(path) for marker in rule["markers"])
+        ]
+        check(not offenders,
+              "%s is the sole source of %s" % (rule["owner"], rule["rule"]),
+              "restated in %s — reference the owner instead of copying"
+              % ", ".join(offenders))
+
+    for drift in FORBIDDEN_DRIFT:
+        path = os.path.join(ROOT, drift["path"])
+        present = os.path.isfile(path) and drift["phrase"] in read_text(path)
+        check(not present,
+              "%s free of known rule drift" % drift["path"],
+              drift["message"])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate the ASCOS skill package.")
     parser.add_argument("--strict", action="store_true", help="treat warnings as failures")
@@ -269,6 +321,7 @@ def main() -> int:
     validate_templates()
     validate_eval_cases()
     validate_duplicate_rules()
+    validate_rule_drift()
 
     errors = [msg for level, msg in FINDINGS if level == "error"]
     warnings = [msg for level, msg in FINDINGS if level == "warn"]

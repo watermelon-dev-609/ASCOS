@@ -3,7 +3,7 @@
 > A software-development orchestration skill that turns incomplete user requirements into production-ready solutions through dynamic expert-role switching, first-principles reasoning, adversarial review, enterprise engineering standards, automated testing, review, and risk analysis.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)](ascos.json)
+[![Version](https://img.shields.io/badge/Version-1.1.1-green.svg)](ascos.json)
 
 ---
 
@@ -106,8 +106,11 @@ See [`CHANGELOG.md`](CHANGELOG.md) and [`RELEASE_NOTES.md`](RELEASE_NOTES.md) fo
 Clone this repository into your Codex skills directory:
 
 ```bash
-git clone https://github.com/watermelon-dev-609/ASCOS-v1.0.git ~/.codex/skills/ai-software-company-skill
+git clone https://github.com/watermelon-dev-609/ASCOS.git ~/.codex/skills/ai-software-company-skill
 ```
+
+> The repository was renamed from `ASCOS-v1.0` to `ASCOS`. The old URL still
+> redirects, but use this one as canonical.
 
 Restart Codex after installation if the skill does not appear immediately.
 
@@ -121,7 +124,11 @@ Invoke the skill when you want Codex to handle software work with a full enginee
 Use $ai-software-company-skill to plan, implement, test and review this software task.
 ```
 
-The skill is tool-agnostic: the `SKILL.md` contract works the same in Codex, Cursor, Claude Code, or any agent that loads Markdown-based skills.
+Portability: the skill is **designed to be portable** — plain Markdown, no host-specific APIs.
+It is **currently verified on Codex**; other hosts (Cursor, Claude Code, and any agent that loads
+Markdown-based skills) are **best-effort**. Hosts differ in nested-skill loading, subagent support
+and auto-trigger behaviour, so `code-review` defines an explicit fallback when subagents are
+unavailable. Verified hosts are listed in [`ascos.json`](ascos.json).
 
 ---
 
@@ -133,7 +140,7 @@ The skill is tool-agnostic: the `SKILL.md` contract works the same in Codex, Cur
 | `skills/` | Six capability skills (**behaviour**: what to do now) — `requirements`, `architecture`, `implementation`, `debugging`, `code-review`, `verification` |
 | `references/` | Knowledge modules (**what to follow**): security, frontend, backend, database, testing, release, observability, roles, context-model, non-negotiables, engineering-standards… |
 | `templates/` | PRD, ADR, API_SPEC, TEST_PLAN, CONTEXT document templates |
-| `evals/` | 21 regression cases for the skill itself (small / medium / large / bugs / adversarial) |
+| `evals/` | 22 regression cases for the skill itself (small / medium / large / bugs / adversarial) |
 | `scripts/` | `validate_skill.py` — structural validator (front-matter, dead links, orphan skills, size) |
 | `agents/` | Codex UI metadata |
 | `ascos.json` | Skill metadata |
@@ -192,6 +199,6 @@ This project is open source under the [MIT License](LICENSE).
 
 ## Version
 
-Current version: **v1.1.0**
+Current version: **v1.1.1**
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the change history.
