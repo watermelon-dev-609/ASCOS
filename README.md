@@ -3,7 +3,7 @@
 > A software-development orchestration skill that turns incomplete user requirements into production-ready solutions through dynamic expert-role switching, first-principles reasoning, adversarial review, enterprise engineering standards, automated testing, review, and risk analysis.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.2.0-green.svg)](ascos.json)
+[![Version](https://img.shields.io/badge/Version-1.2.1-green.svg)](ascos.json)
 
 ---
 
@@ -140,8 +140,8 @@ unavailable. Verified hosts are listed in [`ascos.json`](ascos.json).
 | `skills/` | Six capability skills (**behaviour**: what to do now) — `requirements`, `architecture`, `implementation`, `debugging`, `code-review`, `verification` |
 | `references/` | Knowledge modules (**what to follow**): security, frontend, backend, database, testing, release, observability, roles, context-model, non-negotiables, engineering-standards… |
 | `templates/` | PRD, ADR, API_SPEC, TEST_PLAN, CONTEXT document templates |
-| `evals/` | 22 regression cases for the skill itself (small / medium / large / bugs / adversarial) |
-| `scripts/` | `validate_skill.py` — structural validator (front-matter, dead links, orphan skills, size) |
+| `evals/` | 42 cases: 22 behaviour (small / medium / large / bugs / adversarial) + 20 trigger (10 must-fire / 10 must-not-fire) |
+| `scripts/` | `validate_skill.py` (structural validator), `eval_harness.py` (eval runner: check / prompt / ingest / report), `test_eval_tools.py` (unit tests) |
 | `agents/` | Codex UI metadata |
 | `ascos.json` | Skill metadata |
 | `AGENTS.md` | Agent entry-point guidance |
@@ -151,7 +151,39 @@ Run the validator before committing:
 
 ```bash
 python scripts/validate_skill.py --strict
+python scripts/eval_harness.py check --strict
+python scripts/test_eval_tools.py
 ```
+
+---
+
+## Eval evidence
+
+Measured behaviour, with the protocols written down **before** each run so the
+thresholds cannot be fitted to the results afterwards:
+
+```bash
+python scripts/eval_harness.py report --k 1 3     # evals/results/report.md
+```
+
+Recorded runs live in `evals/runs/`, raw records in `evals/results/records.jsonl`.
+
+| Run | What it measured | Result |
+|---|---|---|
+| Round 4 · faithful arm | Does ASCOS fire when it should, and stay out when it shouldn't? 3 passes over the 10 near-miss cases | must-not-fire **30/30, zero misfires**; must-fire 7/10 |
+| Round 3 · forced arm | Same suite, but `SKILL.md` force-loaded — measures "ASCOS always on", **not** triggering | must-fire 10/10; must-not-fire 2/10 |
+
+**Read the delta with care.** On must-fire cases the with/without delta is partly
+true by construction — an arm with no ASCOS cannot fire — so it shows the arms were
+isolated, not that ASCOS improved anything. The informative number is how often the
+with arm fires on must-not-fire cases.
+
+**Triggering is highly sensitive to how the skill is loaded** (0/10 · 10/10 · 7/10
+across three loading mechanisms on the same 20 cases). Trigger rates are therefore
+not comparable across harnesses unless the loading method is stated too. The
+Round 3 headline of "2 misfires" turned out to be an artefact of force-loading and
+did not reproduce in Round 4 — the corresponding rule change was withdrawn rather
+than shipped.
 
 ---
 
@@ -199,6 +231,6 @@ This project is open source under the [MIT License](LICENSE).
 
 ## Version
 
-Current version: **v1.2.0**
+Current version: **v1.2.1**
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the change history.

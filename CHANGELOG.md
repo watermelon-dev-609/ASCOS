@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.2.1 — 触发评测的装载方式修正
+不新增规则，只修正「怎么测触发」——以及撤回一个基于错误测量得出的结论。
+
+**背景**：v1.2.0 的首次触发跑（Round 3）报出 T18 / T20 两例 `risk-tail` 误触发。
+本轮发现**那次测量的 with 臂搭错了**：子会话不会被注入 `AGENTS.md`，
+于是当时改用显式「先读 `SKILL.md`」指令 —— 而**强制加载等于替模型做了"要不要触发"这个决定**，
+抹掉的正是被测变量。
+
+**三种装载方式对照**（同一批 20 例、同一判分标准）：
+
+| 机制 | must-fire 命中 | must-not-fire 正确 |
+|---|:--:|:--:|
+| M0 无装载（子会话不注射任何东西） | 0 / 10 | 臂未建立，无意义 |
+| M1 强制加载（显式要求先读 `SKILL.md`） | 10 / 10 | **2 / 10** |
+| M2 忠实装载（只给 description，触发时才加载） | 7 / 10 | **30 / 30** |
+
+**触发行为对装载方式极度敏感**（0/10 vs 10/10 vs 7/10，差异远大于任何 run 间噪声）。
+结论：**跨 harness 比较触发率没有意义，除非装载方式也写进协议。**
+
+**结果（`evals/runs/2026-09-14-round4-faithful-arm.md`）**
+- must-not-fire 三轮 **30/30 零误触发** → 按预先登记判据（≥2/3 才修），
+  **T18/T20 不进入 v1.3 修复队列**，`non-negotiables` 的反向边界**先不加**
+- must-fire 7/10，两例真实欠触发（T01 改文案、T08 review），一例环境污染物（T05 被微信支付连接器截走）
+- 登记两个未决项：① 欠触发是否要修（n=1，先观察）② `misfire_shape` 分类表有个洞 ——
+  4 例（T13/T15/T17/T19）出现"点名 Skill 但无分级无调用链"的范围声明，
+  按用户给的示例判为 `none`，**若裁定"点名 Skill 本身即越界"则结论反转**
+
+**新增**
+- `misfire_shape` 字段（`none` / `risk-tail` / `router-language` / `PRD-overreach` /
+  `DoD-overreach` / `subskill-name-leak`）：只记录误触发**长什么样**，不评分。
+  must-not-fire 记录**必须**带，且与 verdict 矛盾时 `ingest` / `check` 双向拒绝
+- `report` 新增 Misfire shapes 表：按 variant 分桶（跨臂混算会让 without 臂的噪声
+  污染 with 臂的修复决策），并列出涉及用例 —— "跨用例同 shape"这条判据需要看是哪些用例
+- `report` 在 Behaviour delta 下加永久警示：must-fire 那一半的 delta **按定义成立**，
+  只能证明两臂隔离有效，不能证明 ASCOS 让答案变好
+- `scripts/test_eval_tools.py`（19 项单测，已进 CI）：pass@k 边界、frontmatter 不被正文
+  水平线截断、阅卷备注剔除、`misfire_shape` 的五种非法组合
+
+**修复**
+- `_misfire_section` 的 tally 原先跨臂混算
+- Round 3 运行文档里新增章节把有序列表打断，第 5 条被孤立
+- Round 3 的 with 臂记录移出 `records.jsonl`，归档为 `round3-pilot-forced-arm.jsonl`；
+  `records.jsonl` 是唯一真源，其余是归档快照
+
 ## 1.2.0 — Eval Harness
 规则冻结后的第一个版本：**不新增任何规则**，只把「ASCOS 到底有没有改变行为」从感觉变成可重复测量。
 

@@ -20,6 +20,10 @@ What this deliberately does NOT do
 Run records (JSONL, one object per line):
     {"case": "E01", "variant": "with_skill", "run": 1, "verdict": "pass",
      "seconds": 41.2, "tokens": 9130, "transcript": "path/or/url", "note": ""}
+
+Must-not-fire trigger cases add `misfire_shape` (one of MISFIRE_SHAPES).
+It is required there: "did it misfire" without "what shape was it" cannot
+tell a one-off slip from a rule that is missing its boundary.
 """
 
 from __future__ import annotations
@@ -43,6 +47,13 @@ SKILLS = ("requirements", "architecture", "implementation",
 VARIANTS = ("with_skill", "without_skill")
 BEHAVIOUR_VERDICTS = ("pass", "fail")
 TRIGGER_VERDICTS = ("fire", "not_fire")
+
+# Shape of a must-not-fire misfire. Recording *what kind* of overreach happened
+# matters more than the count: two different shapes point at two different
+# rules, while the same shape across different cases points at one missing
+# boundary. See evals/runs/2026-09-14-round3-triggers.md.
+MISFIRE_SHAPES = ("none", "risk-tail", "router-language", "PRD-overreach",
+                  "DoD-overreach", "subskill-name-leak")
 
 MIN_FIRE = 10  # the corpus must keep 10 must-fire / 10 must-not-fire or it
 MIN_NOT_FIRE = 10  # stops being able to detect either kind of trigger failure
@@ -154,6 +165,22 @@ def records_check(report: Report, cases: list[dict]) -> None:
         else:
             report.check(verdict in BEHAVIOUR_VERDICTS, "%s verdict matches its case type" % label,
                          "behaviour case expects pass/fail, got %r" % verdict)
+
+        shape = rec.get("misfire_shape")
+        if expect == "not_fire":
+            report.check(shape in MISFIRE_SHAPES,
+                         "%s records a misfire_shape" % label,
+                         "must-not-fire records need one of %s, got %r"
+                         % (MISFIRE_SHAPES, shape))
+            if shape in MISFIRE_SHAPES:
+                consistent = ((verdict == "not_fire" and shape == "none")
+                              or (verdict == "fire" and shape != "none"))
+                report.check(consistent, "%s shape agrees with its verdict" % label,
+                             "verdict=%r but shape=%r" % (verdict, shape))
+        elif shape is not None:
+            report.check(shape == "none",
+                         "%s has no shape to record" % label,
+                         "only must-not-fire cases carry a misfire_shape, got %r" % shape)
 
 
 # --- records --------------------------------------------------------------
@@ -293,6 +320,18 @@ def cmd_ingest(args) -> int:
         allowed = TRIGGER_VERDICTS if expect in TRIGGER_VERDICTS else BEHAVIOUR_VERDICTS
         if rec.get("verdict") not in allowed:
             errors.append("#%d: verdict must be one of %s for this case" % (i, allowed))
+        if expect == "not_fire":
+            shape = rec.get("misfire_shape")
+            if shape not in MISFIRE_SHAPES:
+                errors.append("#%d: misfire_shape must be one of %s for a "
+                              "must-not-fire case" % (i, MISFIRE_SHAPES))
+            elif ((rec.get("verdict") == "not_fire" and shape != "none")
+                  or (rec.get("verdict") == "fire" and shape == "none")):
+                errors.append("#%d: verdict=%r and misfire_shape=%r contradict "
+                              "each other" % (i, rec.get("verdict"), shape))
+        elif rec.get("misfire_shape", "none") != "none":
+            errors.append("#%d: only must-not-fire cases carry a misfire_shape, "
+                          "got %r" % (i, rec.get("misfire_shape")))
         key = (rec.get("case"), rec.get("variant"), rec.get("run"))
         if key in index and not args.replace:
             errors.append("#%d: %s run %s already recorded (use --replace)"
@@ -312,6 +351,58 @@ def cmd_ingest(args) -> int:
     print("ingested %d record(s) → %s (%d total)"
           % (len(incoming), rel(RECORDS_FILE), len(existing)))
     return 0
+
+
+def _misfire_section(cases: dict[str, dict], by_case: dict) -> list[str]:
+    """Aggregate must-not-fire records by shape.
+
+    Deliberately reports counts only. Whether a count crosses the fix
+    threshold is a decision registered in the run protocol before the run,
+    not something the aggregator gets to decide after seeing the numbers.
+    """
+    rows: list[tuple[str, str, int, int, list[str]]] = []
+    # Keyed by variant: "the same shape across cases" only counts as one
+    # systemic problem within an arm. Pooling arms would let a without-arm
+    # slip look like evidence about the with-arm rules.
+    tally: dict[tuple[str, str], list[str]] = {}
+    for cid in sorted(by_case):
+        if cases.get(cid, {}).get("expect") != "not_fire":
+            continue
+        for variant in VARIANTS:
+            runs = by_case[cid].get(variant, [])
+            if not runs:
+                continue
+            fires = [r for r in runs if r.get("verdict") == "fire"]
+            shapes = [r.get("misfire_shape", "?") for r in runs]
+            for shape in shapes:
+                if shape != "none":
+                    tally.setdefault((variant, shape), []).append(cid)
+            rows.append((cid, variant, len(runs), len(fires), shapes))
+
+    if not rows:
+        return []
+
+    out = ["## Misfire shapes (must-not-fire cases)", "",
+           "Counts only — the fix threshold is registered in the run protocol, "
+           "not derived here.", "",
+           "| case | variant | runs | fires | shapes |",
+           "|---|:--:|:--:|:--:|---|"]
+    for cid, variant, n, fires, shapes in rows:
+        out.append("| %s | %s | %d | %d | %s |"
+                   % (cid, variant, n, fires, ", ".join(shapes)))
+    out += [""]
+    if tally:
+        # The cross-case criterion asks *which* cases share a shape, so the
+        # tally has to name them — a bare count forces a manual lookup.
+        out += ["| variant | shape | occurrences | cases |", "|---|:--:|:--:|---|"]
+        for (variant, shape), cids in sorted(tally.items(),
+                                             key=lambda kv: (-len(kv[1]), kv[0])):
+            out.append("| %s | %s | %d | %s |"
+                       % (variant, shape, len(cids), ", ".join(sorted(set(cids)))))
+    else:
+        out += ["No misfire recorded in this batch."]
+    out += [""]
+    return out
 
 
 def cmd_report(args) -> int:
@@ -360,6 +451,10 @@ def cmd_report(args) -> int:
             agg["tok"] += [r["tokens"] for r in runs if "tokens" in r]
         lines.append("")
 
+    misfire = _misfire_section(cases, by_case)
+    if misfire:
+        lines += misfire
+
     lines.append("## Totals")
     lines.append("")
     lines.append("| variant | records | hit rate | mean s | mean tokens |")
@@ -376,7 +471,12 @@ def cmd_report(args) -> int:
     if with_skill and without:
         delta = (100.0 * with_skill["hits"] / with_skill["n"]
                  - 100.0 * without["hits"] / without["n"])
-        lines += ["", "**Behaviour delta (with_skill − without_skill): %+.0f pp**" % delta, ""]
+        lines += ["", "**Behaviour delta (with_skill − without_skill): %+.0f pp**" % delta, "",
+                  "> On must-fire cases this delta is largely true by construction: "
+                  "an arm with no ASCOS in it cannot fire. It shows the two arms were "
+                  "actually isolated, not that ASCOS made the answers better. The "
+                  "informative half is how often the with arm fires on must-not-fire "
+                  "cases — see the misfire table above.", ""]
     else:
         lines += ["", "_Behaviour delta needs both variants recorded._", ""]
 

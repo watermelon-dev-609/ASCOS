@@ -1,0 +1,40 @@
+{"case": "T01", "variant": "with_skill", "run": 1, "verdict": "not_fire", "note": "miss: answered as plain assistant, no sizing/route/ASCOS deliverable"}
+{"case": "T02", "variant": "with_skill", "run": 1, "verdict": "fire", "note": "sized 中+security, route requirements→architecture→implementation→verification"}
+{"case": "T03", "variant": "with_skill", "run": 1, "verdict": "fire", "note": "route debugging, falsifiable hypotheses, wants red feedback loop first"}
+{"case": "T04", "variant": "with_skill", "run": 1, "verdict": "fire", "note": "sized 大, route requirements→architecture→implementation→verification"}
+{"case": "T05", "variant": "with_skill", "run": 1, "verdict": "not_fire", "note": "miss: hijacked by the environment's weixinpay connector, never reached ASCOS"}
+{"case": "T06", "variant": "with_skill", "run": 1, "verdict": "fire", "note": "sized 大, route architecture→implementation→verification"}
+{"case": "T07", "variant": "with_skill", "run": 1, "verdict": "fire", "note": "sized 小, route implementation"}
+{"case": "T08", "variant": "with_skill", "run": 1, "verdict": "not_fire", "note": "miss: produced a plain review with no structural ASCOS signal"}
+{"case": "T09", "variant": "with_skill", "run": 1, "verdict": "fire", "note": "route debugging, evidence-graded, refused to guess without evidence"}
+{"case": "T10", "variant": "with_skill", "run": 1, "verdict": "fire", "note": "named the orchestrator skill and its process"}
+{"case": "T11", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T12", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T13", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: one-clause scope disclaimer naming the skill, no sizing, no chain"}
+{"case": "T14", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T15", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: one-clause scope disclaimer naming the skill, no sizing, no chain"}
+{"case": "T16", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T17", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: one-clause scope disclaimer, no sizing, no chain"}
+{"case": "T18", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "note": "run-1 pilot misfired here (risk-tail); did not reproduce"}
+{"case": "T19", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: one-clause scope disclaimer, no sizing, no chain"}
+{"case": "T20", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "note": "run-1 pilot misfired here (risk-tail); did not reproduce"}
+{"case": "T11", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T12", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T13", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: one-clause scope disclaimer naming the skill, no sizing, no chain"}
+{"case": "T14", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T15", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: one-clause scope disclaimer naming the skill, no sizing, no chain"}
+{"case": "T16", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T17", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: one-clause scope disclaimer, no sizing, no chain"}
+{"case": "T18", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T19", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: names the skill, no sizing, no chain"}
+{"case": "T20", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T11", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T12", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T13", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: names the skill and says it will not start the dev flow, no sizing, no chain"}
+{"case": "T14", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T15", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: names the skill, no sizing, no chain"}
+{"case": "T16", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none"}
+{"case": "T17", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: one-clause scope disclaimer, no sizing, no chain"}
+{"case": "T18", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: '不需要走开发编排流程' opening clause, then plain answer"}
+{"case": "T19", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "note": "borderline: names the skill, no sizing, no chain"}
+{"case": "T20", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none"}

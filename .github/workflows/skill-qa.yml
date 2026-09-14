@@ -19,6 +19,9 @@ jobs:
       - name: Validate skill structure
         run: python scripts/validate_skill.py --strict
 
+      - name: Run unit tests
+        run: python scripts/test_eval_tools.py
+
       - name: Validate eval corpus
         run: python scripts/eval_harness.py check --strict
 
