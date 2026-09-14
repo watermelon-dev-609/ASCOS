@@ -11,8 +11,9 @@
 | `large/` | 4 | 文档链路、架构判据、分叉点穷问、反过度设计 |
 | `bugs/` | 5 | 反馈环优先、可证伪假设、回归测试、性能先测量、**建不出环时的降级路径** |
 | `adversarial/` | 4 | 四条硬底线：不谎报、不迎合、安全边界、补全不狂问 |
+| `triggers/` | 20 | **触发边界**：10 例必须触发 + 10 例必须**不**触发（知识问答 / 文案 / 翻译 / 用法咨询等 near-miss） |
 
-共 **22 个用例**。
+共 **42 个用例**（22 行为 + 20 触发）。
 
 ## 第一轮：人工观察，不自动评分
 第一轮**不要**做自动打分。把用例的输入原样喂给模型，人工读它的行为，重点看四件事：
@@ -34,6 +35,36 @@
 > **⚠️ 跑测环境前提**：必须给它真实代码库和命令执行权限。
 > 第一轮因为没有文件和终端访问，bugs 组 5 例**全部**落在 L2，导致「该给 L0 却降级」这类问题完全测不出来。
 > 没有真实环境时，bugs 组的证据分级维度是失效的。
+
+## v1.2 起：用 `scripts/eval_harness.py` 跑
+harness **不替你跑模型，也不替你打分**。它固定的是「跑什么、记什么、怎么汇总」，
+让两次运行之间可比。**没有 live 模式、不联网、不调 API** —— 判定由跑用例的人或 Agent 给出，
+作为数据灌进来。一个会悄悄退化成"模型自己说没问题"的 eval，比没有 eval 更糟。
+
+```bash
+python scripts/eval_harness.py check --strict          # 语料体检（CI 跑这个）
+python scripts/eval_harness.py prompt --group trigger  # 导出可直接发送的输入
+python scripts/eval_harness.py ingest --file runs.jsonl
+python scripts/eval_harness.py report --k 1 3          # → evals/results/report.md
+```
+
+### 记录格式（JSONL，一行一条）
+```json
+{"case": "E14", "variant": "with_skill", "run": 1, "verdict": "pass", "seconds": 41.2, "tokens": 9130}
+```
+| 字段 | 作用 |
+|---|---|
+| `variant` | `with_skill` / `without_skill`，用来算 **Behaviour Delta**（带不带 Skill 的命中率差） |
+| `run` | 同一用例第几次跑，用来算 **pass@k** |
+| `verdict` | 行为用例 `pass` / `fail`；触发用例 `fire` / `not_fire` |
+| `seconds` / `tokens` | 可选，用于成本对比（ASCOS 变强但把 token 翻倍，也值得知道） |
+
+### 三条硬边界
+1. `## 输入` 里的 `>` 引用块是**阅卷备注**，导出 prompt 时会被剔除 ——
+   不能让 Agent 看见评测设置（fixture README 泄漏根因、把 L0 用例变成听写，就是这么发生的）。
+2. **触发用例只测「该不该接管」**，不测产出质量；行为用例才测质量。两者不混用判据。
+3. 汇总表里的 `—` 表示**样本不足、不算测量**（runs < k），不是 0。
+   宁可留空，也不把猜测写成数字。
 
 ## 通用评分表（每个用例额外叠加）
 | 维度 | 判定 |

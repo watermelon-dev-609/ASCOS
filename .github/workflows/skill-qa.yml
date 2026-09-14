@@ -19,6 +19,9 @@ jobs:
       - name: Validate skill structure
         run: python scripts/validate_skill.py --strict
 
+      - name: Validate eval corpus
+        run: python scripts/eval_harness.py check --strict
+
       - name: Report eval inventory
         run: |
           echo "eval cases: $(find evals -name '*.md' ! -name 'README.md' | wc -l)"

@@ -20,7 +20,8 @@ import sys
 
 # Shared corpus primitives live in one place; see eval_common.py for why.
 from eval_common import (  # noqa: E402  (sys.path is the script's own dir)
-    ROOT, SKIP_DIRS, Report, markdown_files, parse_front_matter, read_text, rel,
+    EVALS_DIR, ROOT, SKIP_DIRS, Report, markdown_files, parse_front_matter,
+    read_text, rel,
 )
 SKILLS_DIR = os.path.join(ROOT, "skills")
 REFS_DIR = os.path.join(ROOT, "references")
@@ -225,7 +226,11 @@ def validate_eval_cases() -> None:
         return
     total = 0
     for base, dirs, files in os.walk(evals_dir):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and d != "runs"]
+        # triggers/ carries no 期望路由: those cases test whether the skill
+        # fires at all. scripts/eval_harness.py lints them instead, so this
+        # check must not also claim them.
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and d != "runs"
+                   and d != "triggers"]
         for name in files:
             if not name.endswith(".md") or name == "README.md":
                 continue
@@ -239,9 +244,12 @@ def validate_eval_cases() -> None:
 def validate_duplicate_rules() -> None:
     """Same bullet rule repeated across files usually means a DRY leak."""
     seen: dict[str, set[str]] = {}
+    evals_abs = os.path.abspath(EVALS_DIR)
     for path in markdown_files():
         if os.path.dirname(path) == TEMPLATES_DIR:
             continue  # templates legitimately echo examples from references
+        if os.path.abspath(path).startswith(evals_abs + os.sep):
+            continue  # eval cases share boilerplate 判定 bullets by design
         for line in read_text(path).splitlines():
             stripped = line.strip()
             if stripped.startswith("- ") and len(stripped) >= 24:

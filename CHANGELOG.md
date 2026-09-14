@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.2.0 — Eval Harness
+规则冻结后的第一个版本：**不新增任何规则**，只把「ASCOS 到底有没有改变行为」从感觉变成可重复测量。
+
+**新增**
+- **`scripts/eval_harness.py`**，四个子命令：
+  - `check` —— 语料体检（id 唯一 / group 合法 / expect 有效 / 路由指向真实 Skill /
+    判定与输入存在 / 触发组至少 10+10 / 已灌入的记录引用存在的用例）。CI 跑这个
+  - `prompt` —— 导出可直接发送的输入，支持 `--id` / `--group` / `plain` / `jsonl`
+  - `ingest` —— 灌入运行记录（JSONL），校验 case / variant / run / verdict 一致性，
+    重复 `(case, variant, run)` 默认报错，需显式 `--replace`
+  - `report` —— 聚合成 `evals/results/report.md`：命中率、**pass@k**、mean seconds / tokens、
+    **Behaviour Delta**（`with_skill` − `without_skill`）
+- **`evals/triggers/` 20 例触发评测**：10 例必须触发（改文案 / 加登录 / 查 Bug / 从零搭 /
+  接支付 / 拆单体 / 分页搜索 / 审 diff / 上线事故 / CRUD）+ 10 例必须**不**触发
+  （SQL 教程 / 解释深模块 / 润色文案 / 延期邮件 / 翻译 / rebase-vs-merge / 总结文章 /
+  起名 / 会议纪要 / 库用法）。其中 T12 专门测"ASCOS 自己的术语出现在问题里"会不会误触发
+- 22 个既有用例补上机器可读 frontmatter（`id` / `group` / `expect` / `route` / `needs_repo`），
+  由一次性脚本从标题与「期望路由」行**抽取**，不是重打一遍，避免抄错
+
+**修复**
+- `scripts/eval_common.py` 切分正文时原先按分隔符 `split`，正文里出现 `---` 水平线就会被截断 ——
+  E14 / E15 / E22 三个 fixture 用例命中，导致「判定」「输入」被判为缺失。改为按闭合分隔符的偏移量切片
+- `validate_skill.py` 不再对 `evals/triggers/` 要求「期望路由」（触发用例测的是该不该接管，
+  没有路由可期望），也不再把用例之间共用的判定模板行当成跨文件重复规则
+- `prompt` 导出会剔除 `## 输入` 里的 `>` 引用块：那是阅卷备注，不能让 Agent 看见评测设置
+
+**明确不做**（边界写在这里，防止后面被好心加回来）
+- **没有 live 模式、不联网、不调 API**。判定由跑用例的人或 Agent 给出，作为数据灌入；
+  harness 只做校验 / 存储 / 汇总。会悄悄退化成"模型自己说没问题"的 eval 比没有 eval 更糟
+- **不自带基线**。`evals/results/` 首次运行前是空的，不预置任何数字
+- **不自己打分**。汇总表里 `—` = 样本不足（runs < k）、不算测量，不是 0
+
 ## 1.1.2
 规则边界修补 —— 这是 v1.2 之前的**最后一次规则改动**，之后冻结规则，只做 Eval Harness。
 

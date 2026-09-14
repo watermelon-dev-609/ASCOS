@@ -94,6 +94,21 @@ def parse_front_matter(text: str) -> dict | None:
     return data
 
 
+def split_front_matter(text: str) -> tuple[dict | None, str]:
+    """Front-matter plus the body that follows it.
+
+    Splitting on the delimiter string would cut at the first horizontal rule
+    inside the body too, silently truncating the case. Slice on the offset of
+    the *closing* delimiter instead.
+    """
+    if not text.startswith("---\n"):
+        return None, text
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return None, text
+    return parse_front_matter(text), text[end + len("\n---\n"):]
+
+
 def markdown_files() -> list[str]:
     """Every markdown file that counts as package content, sorted."""
     found = []
@@ -135,9 +150,8 @@ def load_cases() -> list[dict]:
     if not os.path.isdir(EVALS_DIR):
         return cases
     for path in _eval_case_files():
-        text = read_text(path)
-        meta = parse_front_matter(text) or {}
-        body = text.split("\n---\n", 2)[-1] if text.startswith("---\n") else text
+        meta, body = split_front_matter(read_text(path))
+        meta = meta or {}
         meta["_path"] = path
         meta["_rel"] = rel(path)
         meta["_body"] = body
