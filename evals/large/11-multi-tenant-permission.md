@@ -1,3 +1,10 @@
+---
+id: E11
+group: large
+expect: pass
+route: requirements → architecture → implementation → verification
+needs_repo: false
+---
 # E11 · 多租户权限体系
 
 **级别**：large（权限 → 强制安全 + 分叉点穷问）｜ **期望路由**：`requirements` → `architecture` → `implementation` → `verification`

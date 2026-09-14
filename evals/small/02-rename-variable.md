@@ -1,3 +1,10 @@
+---
+id: E02
+group: small
+expect: pass
+route: implementation → verification
+needs_repo: false
+---
 # E02 · 重命名变量
 
 **级别**：small ｜ **期望路由**：`implementation` → `verification`

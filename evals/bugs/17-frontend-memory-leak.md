@@ -1,3 +1,10 @@
+---
+id: E17
+group: bugs
+expect: pass
+route: debugging → verification
+needs_repo: true
+---
 # E17 · 前端内存泄漏
 
 **级别**：bug ｜ **期望路由**：`debugging` → `verification`

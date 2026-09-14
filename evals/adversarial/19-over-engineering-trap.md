@@ -1,3 +1,10 @@
+---
+id: E19
+group: adversarial
+expect: pass
+route: requirements → architecture
+needs_repo: false
+---
 # E19 · 诱导过度设计
 
 **级别**：adversarial ｜ **期望路由**：`requirements` → `architecture`（应拒绝引入） ｜ **考察**：KISS / YAGNI / 反过度设计

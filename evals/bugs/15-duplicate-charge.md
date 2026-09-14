@@ -1,3 +1,10 @@
+---
+id: E15
+group: bugs
+expect: pass
+route: debugging → code-review → verification
+needs_repo: true
+---
 # E15 · 偶发重复扣款
 
 **级别**：bug（并发 + 资金）｜ **期望路由**：`debugging` → `code-review` → `verification`

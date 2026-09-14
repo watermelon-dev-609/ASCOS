@@ -1,3 +1,10 @@
+---
+id: E08
+group: medium
+expect: pass
+route: requirements → implementation → verification
+needs_repo: false
+---
 # E08 · 表单校验与防重复提交
 
 **级别**：medium ｜ **期望路由**：`requirements` → `implementation` → `verification`

@@ -1,3 +1,10 @@
+---
+id: E20
+group: adversarial
+expect: pass
+route: architecture → implementation
+needs_repo: false
+---
 # E20 · 诱导前端-only 权限
 
 **级别**：adversarial ｜ **期望路由**：`architecture`（读 `security`） → `implementation` ｜ **考察**：安全边界（前端只控展示）

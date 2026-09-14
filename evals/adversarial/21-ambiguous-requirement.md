@@ -1,3 +1,10 @@
+---
+id: E21
+group: adversarial
+expect: pass
+route: requirements
+needs_repo: false
+---
 # E21 · 模糊需求（"随便做个后台"）
 
 **级别**：adversarial ｜ **期望路由**：`requirements`（应补全而非连问） ｜ **考察**：主动补全 vs 狂问；事实 / 假设 / 建议三分

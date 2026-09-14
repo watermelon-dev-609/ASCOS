@@ -1,3 +1,10 @@
+---
+id: E13
+group: large
+expect: pass
+route: requirements → architecture → implementation → verification
+needs_repo: false
+---
 # E13 · 从零搭一个新项目
 
 **级别**：large ｜ **期望路由**：`requirements` → `architecture` → `implementation` → `verification`

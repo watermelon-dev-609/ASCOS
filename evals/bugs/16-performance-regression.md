@@ -1,3 +1,10 @@
+---
+id: E16
+group: bugs
+expect: pass
+route: debugging → verification
+needs_repo: true
+---
 # E16 · 接口性能回退
 
 **级别**：bug（性能）｜ **期望路由**：`debugging` → `verification`

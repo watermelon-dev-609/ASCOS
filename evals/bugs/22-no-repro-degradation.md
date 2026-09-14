@@ -1,3 +1,10 @@
+---
+id: E22
+group: bugs
+expect: pass
+route: debugging
+needs_repo: true
+---
 # E22 · 无法复现的线上 Bug（只有日志）—— 降级路径
 
 **级别**：bug ｜ **期望路由**：`debugging`（应走到 L1/L2 降级，**不是**直接停住）｜ **考察**：证据分级与降级是否被正确执行

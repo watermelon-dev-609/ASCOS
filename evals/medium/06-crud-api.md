@@ -1,3 +1,10 @@
+---
+id: E06
+group: medium
+expect: pass
+route: requirements → implementation → code-review → verification
+needs_repo: false
+---
 # E06 · 新增 CRUD API
 
 **级别**：medium ｜ **期望路由**：`requirements` → `implementation` → `code-review` → `verification`

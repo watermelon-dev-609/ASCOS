@@ -1,3 +1,10 @@
+---
+id: E05
+group: medium
+expect: pass
+route: requirements → architecture → implementation → verification
+needs_repo: false
+---
 # E05 · 登录功能
 
 **级别**：medium（含鉴权 → 强制安全审查）｜ **期望路由**：`requirements` → `architecture`（读 `security`） → `implementation` → `verification`

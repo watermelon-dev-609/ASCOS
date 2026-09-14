@@ -1,3 +1,10 @@
+---
+id: E09
+group: medium
+expect: pass
+route: requirements → architecture → implementation → verification
+needs_repo: false
+---
 # E09 · 接入支付
 
 **级别**：medium（含支付 → 强制安全审查 + 发布检查）｜ **期望路由**：`requirements` → `architecture`（读 `security`） → `implementation` → `verification`（读 `release`）

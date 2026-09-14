@@ -1,3 +1,10 @@
+---
+id: E10
+group: large
+expect: pass
+route: requirements → architecture → implementation → verification
+needs_repo: false
+---
 # E10 · RAG 知识库
 
 **级别**：large ｜ **期望路由**：`requirements` → `architecture` → `implementation` → `verification`

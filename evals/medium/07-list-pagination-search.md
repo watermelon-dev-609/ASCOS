@@ -1,3 +1,10 @@
+---
+id: E07
+group: medium
+expect: pass
+route: requirements → implementation → verification
+needs_repo: false
+---
 # E07 · 列表分页与搜索
 
 **级别**：medium ｜ **期望路由**：`requirements` → `implementation` → `verification`

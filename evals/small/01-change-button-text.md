@@ -1,3 +1,10 @@
+---
+id: E01
+group: small
+expect: pass
+route: implementation → verification
+needs_repo: false
+---
 # E01 · 改按钮文案
 
 **级别**：small ｜ **期望路由**：`implementation` → `verification`

@@ -1,3 +1,10 @@
+---
+id: E14
+group: bugs
+expect: pass
+route: debugging → code-review → verification
+needs_repo: true
+---
 # E14 · 线上 500 错误
 
 **级别**：bug ｜ **期望路由**：`debugging` → `code-review` → `verification`

@@ -1,3 +1,10 @@
+---
+id: E12
+group: large
+expect: pass
+route: architecture → implementation → verification
+needs_repo: false
+---
 # E12 · 单体模块化重构
 
 **级别**：large ｜ **期望路由**：`architecture` → `implementation` → `verification`

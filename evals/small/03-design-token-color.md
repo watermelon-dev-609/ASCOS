@@ -1,3 +1,10 @@
+---
+id: E03
+group: small
+expect: pass
+route: implementation → verification
+needs_repo: false
+---
 # E03 · 改配色（Design Token）
 
 **级别**：small ｜ **期望路由**：`implementation` → `verification`

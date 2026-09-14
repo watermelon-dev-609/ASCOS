@@ -1,3 +1,10 @@
+---
+id: E04
+group: small
+expect: pass
+route: implementation → verification
+needs_repo: false
+---
 # E04 · 补一个空状态
 
 **级别**：small ｜ **期望路由**：`implementation` → `verification`
