@@ -1,0 +1,20 @@
+2026-09-10T01:58:12Z INFO  gateway route=/internal/jobs/nightly-sweep method=POST status=202 trace_id=9f2c1a7b
+2026-09-10T01:58:12Z INFO  gateway upstream=order-service replicas=3 trace_id=9f2c1a7b
+2026-09-10T02:00:03Z INFO  gateway route=/orders/batch method=POST status=200 count=100 trace_id=4d81e0aa
+2026-09-10T02:00:04Z INFO  gateway route=/orders/batch method=POST status=200 count=100 trace_id=7b16c4d2
+2026-09-10T02:00:06Z WARN  gateway route=/orders/batch method=POST status=200 count=37 trace_id=2e5f90c1
+2026-09-10T02:00:06Z INFO  gateway upstream=payment-service latency_ms=4820 trace_id=2e5f90c1
+2026-09-10T02:00:09Z INFO  gateway route=/orders/batch method=POST status=200 count=100 trace_id=c0a37f19
+2026-09-10T02:00:11Z WARN  gateway upstream=payment-service latency_ms=5133 trace_id=c0a37f19
+2026-09-10T02:00:14Z WARN  gateway upstream=payment-service latency_ms=5019 trace_id=88bd245e
+2026-09-10T02:00:31Z INFO  gateway route=/internal/jobs/nightly-sweep method=POST status=200 trace_id=9f2c1a7b
+2026-09-10T02:00:31Z INFO  gateway job=nightly-sweep scanned=237 moved=201 skipped=0 trace_id=9f2c1a7b
+2026-09-10T02:04:02Z WARN  gateway orders_pending_gt_1h=43 trace_id=-
+2026-09-10T02:09:02Z WARN  gateway orders_pending_gt_1h=43 trace_id=-
+2026-09-11T01:58:10Z INFO  gateway route=/internal/jobs/nightly-sweep method=POST status=202 trace_id=1a77d3c6
+2026-09-11T02:00:29Z INFO  gateway job=nightly-sweep scanned=198 moved=166 skipped=0 trace_id=1a77d3c6
+2026-09-11T02:05:01Z WARN  gateway orders_pending_gt_1h=32 trace_id=-
+2026-09-12T02:00:27Z INFO  gateway job=nightly-sweep scanned=241 moved=209 skipped=0 trace_id=55e8b0d4
+2026-09-12T02:05:01Z WARN  gateway orders_pending_gt_1h=38 trace_id=-
+2026-09-13T02:00:33Z INFO  gateway job=nightly-sweep scanned=229 moved=195 skipped=0 trace_id=3c4f2a88
+2026-09-13T02:05:01Z WARN  gateway orders_pending_gt_1h=34 trace_id=-

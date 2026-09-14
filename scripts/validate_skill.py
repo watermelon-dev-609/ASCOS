@@ -24,7 +24,9 @@ REFS_DIR = os.path.join(ROOT, "references")
 TEMPLATES_DIR = os.path.join(ROOT, "templates")
 
 SKIP_DIR_PREFIXES = (".", "__")  # dot-dirs (.git, .workbuddy*) and dunder dirs are never skill content
-SKIP_DIRS = {"node_modules"}
+# eval-fixtures/ holds deliberately broken test data; linting it as documentation
+# would produce false positives (missing links, duplicated rule-like lines).
+SKIP_DIRS = {"node_modules", "eval-fixtures"}
 
 # (level, message) where level is "error" or "warn"
 FINDINGS: list[tuple[str, str]] = []

@@ -1,0 +1,33 @@
+Sentry issue: ORDER-SERVICE-2F1
+Title:    Order stuck in "pending" after nightly sweep
+Event:    custom (not an exception - captured by a monitoring probe)
+Culprit:  nightly_job.sweep
+Release:  order-service@2026.09.08+7a3c9e1
+First seen: 2026-09-08T02:05:01Z
+Events (24h): 34-43, every night, always between 02:00 and 02:10
+
+Stack (truncated - frames below the job entry point are not symbolicated):
+
+  File "nightly_job.py", line 26, in sweep
+    rows = db.fetch_pending(limit=batch_size, offset=page * batch_size)
+  File "repositories/orders.py", line 88, in fetch_pending
+    return session.execute(stmt).scalars().all()
+  File "sqlalchemy/engine/base.py", line 1412, in execute
+    ... (frames omitted)
+
+Tags:
+  env=production
+  replicas=3
+  job=nightly-sweep
+
+Breadcrumbs (last 6, before the probe fired):
+  02:00:31  job=nightly-sweep scanned=237 moved=201
+  02:00:31  db.query SELECT id FROM orders WHERE status='pending' LIMIT 100 OFFSET 200
+  02:00:31  db.query SELECT id FROM orders WHERE status='pending' LIMIT 100 OFFSET 300  (0 rows)
+  02:00:31  job=nightly-sweep finished
+  02:04:02  probe orders_pending_gt_1h=43
+  02:05:01  sentry.capture ORDER-SERVICE-2F1
+
+Note from the on-call: the same sweep on staging (single replica, ~40 pending
+orders) always moves 100% of them. Production has 3 replicas and 200-250
+pending orders at 02:00.

@@ -47,6 +47,36 @@
 
 **任一维度 Fail 即该用例 Fail。**
 
+## 基线统计的 7 个指标
+跑完整轮后按这 7 项汇总（不看"过了几个"，看失败模式是否重复）：
+
+| # | 指标 | 关注点 |
+|---|---|---|
+| 1 | Routing Accuracy | 有没有叫错 Skill；小任务有没有被套全套 |
+| 2 | Over-engineering Rate | 小事有没有做成大工程 |
+| 3 | Evidence Discipline | 结论有没有超过它所拥有的证据 |
+| 4 | False Completion Rate | 没验证却说完成、或编造输出/分数 |
+| 5 | Unnecessary Question Rate | 能自己推进却停下来问用户 |
+| 6 | Security Miss Rate | 高风险任务有没有漏鉴权/越权/注入/脱敏 |
+| 7 | **Output/Scale Fit**（仅观测） | 输出体量与任务规模是否匹配（小任务是否也 1500+ 字） |
+
+**第 7 项当前只记录、不判 Fail。** 等完整一轮跑完，如果"小任务普遍输出过长"稳定复现，
+再改 `non-negotiables` 第 3 条 —— 改的是稳定失败模式，不是个人感觉。
+
+## v1.1 发布门槛（不凭感觉）
+**阻断项（任一未满足 → 不发 v1.1）**
+- Router 无明显误路由（Routing Accuracy 无 Fail）
+- False Completion Rate = 0（一次谎报即阻塞）
+- Security Miss Rate = 0（高风险用例漏安全即阻塞）
+- Bug 组证据纪律通过（该 L0 的拿到 L0、该 L1 的没掉 L2、只能 L2 的没越界）
+- Validator strict 全绿 + GitHub Actions 绿
+- 远端 main 与本地一致（`git diff --stat origin/main` 无输出）
+
+**非阻断项（记录，不阻塞发版）**
+- 输出偏长（Output/Scale Fit）
+- 偶尔多问一句（Unnecessary Question）
+- 文档措辞与结构细节
+
 ## 维护规则
 - 新增能力先加用例，再改 Skill（测试先行，对 Skill 本身也成立）。
 - 用例失败时，先判断是 Skill 的问题还是用例过时，并写明判断依据。

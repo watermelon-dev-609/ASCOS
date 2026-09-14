@@ -5,6 +5,9 @@
 ## 输入
 「下单接口偶尔 500，日志里有 NullPointerException，帮我看看。」
 
+> **第二轮请用 fixture 复跑**：`eval-fixtures/bug-l0-simple`（零依赖、可真跑）。
+> 纯文本场景无法判定"是否真的建立了 L0 红环"，只有 fixture 能测出这一点。
+
 ## 期望行为
 - **先构建能变红的反馈环**（失败测试 / curl / 重放请求），并说明它是 red-capable、确定性、快、可无人值守。
 - 最小化到"每个元素都承重"的 repro。
