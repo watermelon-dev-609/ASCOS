@@ -3,7 +3,7 @@
 > A software-development orchestration skill that turns incomplete user requirements into production-ready solutions through dynamic expert-role switching, first-principles reasoning, adversarial review, enterprise engineering standards, automated testing, review, and risk analysis.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.1.1-green.svg)](ascos.json)
+[![Version](https://img.shields.io/badge/Version-1.1.2-green.svg)](ascos.json)
 
 ---
 
@@ -199,6 +199,6 @@ This project is open source under the [MIT License](LICENSE).
 
 ## Version
 
-Current version: **v1.1.1**
+Current version: **v1.1.2**
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the change history.

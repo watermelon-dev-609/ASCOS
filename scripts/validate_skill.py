@@ -18,19 +18,15 @@ import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Shared corpus primitives live in one place; see eval_common.py for why.
+from eval_common import (  # noqa: E402  (sys.path is the script's own dir)
+    ROOT, SKIP_DIRS, Report, markdown_files, parse_front_matter, read_text, rel,
+)
 SKILLS_DIR = os.path.join(ROOT, "skills")
 REFS_DIR = os.path.join(ROOT, "references")
 TEMPLATES_DIR = os.path.join(ROOT, "templates")
 
-SKIP_DIR_PREFIXES = (".", "__")  # dot-dirs (.git, .workbuddy*) and dunder dirs are never skill content
-# eval-fixtures/ holds deliberately broken test data; linting it as documentation
-# would produce false positives (missing links, duplicated rule-like lines).
-SKIP_DIRS = {"node_modules", "eval-fixtures"}
-
-# (level, message) where level is "error" or "warn"
-FINDINGS: list[tuple[str, str]] = []
-CHECKS: list[str] = []
+REPORT = Report()
 
 MAX_ROOT_SKILL_LINES = 160  # root holds only trigger/classify/route/accept; new knowledge goes to skills/ or references/
 MAX_SKILL_LINES = 260
@@ -43,70 +39,44 @@ MIN_DESCRIPTION_CHARS = 40
 #   - the root debugging contract still said "no red loop -> stop" while
 #     skills/debugging had moved to an explicit evidence ladder
 #   - verification restated a risk-list rule that non-negotiables.md owns
-# So the validator now guards both classes.
-SOLE_SOURCE_RULES = [
+#
+# Each rule declares its single source and the phrases that, *co-occurring* in
+# some other file, mean that file restated the rule. Co-occurrence is the whole
+# trick: a pointer ("见 non-negotiables.md 第 2 条") never trips it, only a
+# copy does. A single-phrase list means "this exact wording anywhere else is
+# drift" — that is how the already-happened-once case below is pinned.
+#
+# Kept as Python rather than YAML because CI runs this on a bare interpreter
+# with no PyYAML; the shape mirrors the YAML spec one-to-one.
+CANONICAL_RULES = [
     {
-        "owner": "non-negotiables.md",
-        "rule": "第 2 条 · 剩余风险清单",
-        # A file *restates* the rule only when every marker co-occurs.
-        # A mere reference ("见 non-negotiables.md 第 2 条") never trips it.
-        "markers": ["越权 / 未授权访问", "并发竞态", "依赖与供应链"],
+        "name": "剩余风险清单",
+        "source": "references/non-negotiables.md",
+        "forbidden_duplicates": ["越权 / 未授权访问", "并发竞态", "依赖与供应链"],
+    },
+    {
+        "name": "证据阶梯降级规则",
+        "source": "skills/debugging/SKILL.md",
+        "forbidden_duplicates": ["无法构建能变红的反馈环"],
+        "message": "contradicts the evidence ladder: when L0 is unavailable it "
+                   "must degrade explicitly (L1/L2), not stop",
+    },
+    {
+        "name": "安全审查触发条件",
+        "source": "references/security.md",
+        "forbidden_duplicates": ["默认拒绝", "对象级鉴权", "日志脱敏"],
     },
 ]
 
-# Drift that already happened once; guarded so it cannot silently come back.
-FORBIDDEN_DRIFT = [
-    {
-        "path": "SKILL.md",
-        "phrase": "无法构建能变红的反馈环",
-        "message": "root contract contradicts the evidence ladder in skills/debugging: "
-                   "when L0 is unavailable it must degrade explicitly, not stop",
-    },
-]
+# A worked example exists to *apply* every rule end to end, so naming them is
+# its job, not a second source of truth. Evals likewise name concepts in order
+# to state expectations.
+DRIFT_EXEMPT = {"references/worked-example.md", "evals/README.md"}
 
 
 def check(ok: bool, label: str, detail: str = "", level: str = "error") -> bool:
     """Record one check result."""
-    CHECKS.append(label)
-    if not ok:
-        FINDINGS.append((level, "%s%s" % (label, (" — " + detail) if detail else "")))
-    return ok
-
-
-def read_text(path: str) -> str:
-    with open(path, encoding="utf-8") as fh:
-        return fh.read()
-
-
-def parse_front_matter(text: str) -> dict | None:
-    """Return the YAML front-matter as a flat dict, or None when absent."""
-    if not text.startswith("---\n"):
-        return None
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return None
-    block = text[4:end]
-    data = {}
-    for line in block.splitlines():
-        match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$", line)
-        if match:
-            data[match.group(1)] = match.group(2).strip().strip('"').strip("'")
-    return data
-
-
-def markdown_files() -> list[str]:
-    found = []
-    for base, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs
-                   if d not in SKIP_DIRS and not d.startswith(SKIP_DIR_PREFIXES)]
-        for name in files:
-            if name.endswith(".md"):
-                found.append(os.path.join(base, name))
-    return sorted(found)
-
-
-def rel(path: str) -> str:
-    return os.path.relpath(path, ROOT).replace("\\", "/")
+    return REPORT.check(ok, label, detail, level)
 
 
 def validate_root_skill() -> None:
@@ -284,27 +254,29 @@ def validate_duplicate_rules() -> None:
 
 def validate_rule_drift() -> None:
     """Catch a rule living in two places, or two versions of the same rule."""
-    for rule in SOLE_SOURCE_RULES:
-        owner = os.path.join(REFS_DIR, rule["owner"])
-        if not os.path.isfile(owner):
+    cache: dict[str, str] = {}
+
+    def body(path: str) -> str:
+        if path not in cache:
+            cache[path] = read_text(path)
+        return cache[path]
+
+    for rule in CANONICAL_RULES:
+        source_abs = os.path.abspath(os.path.join(ROOT, rule["source"]))
+        if not os.path.isfile(source_abs):
+            check(False, "canonical rule %r points at an existing source" % rule["name"],
+                  "%s is missing" % rule["source"])
             continue
-        owner_abs = os.path.abspath(owner)
         offenders = [
             rel(path) for path in markdown_files()
-            if os.path.abspath(path) != owner_abs
-            and all(marker in read_text(path) for marker in rule["markers"])
+            if os.path.abspath(path) != source_abs
+            and rel(path) not in DRIFT_EXEMPT
+            and all(marker in body(path) for marker in rule["forbidden_duplicates"])
         ]
+        detail = rule.get("message") or "reference the source instead of copying it"
         check(not offenders,
-              "%s is the sole source of %s" % (rule["owner"], rule["rule"]),
-              "restated in %s — reference the owner instead of copying"
-              % ", ".join(offenders))
-
-    for drift in FORBIDDEN_DRIFT:
-        path = os.path.join(ROOT, drift["path"])
-        present = os.path.isfile(path) and drift["phrase"] in read_text(path)
-        check(not present,
-              "%s free of known rule drift" % drift["path"],
-              drift["message"])
+              "%s is the sole source of %r" % (rule["source"], rule["name"]),
+              "restated in %s — %s" % (", ".join(offenders), detail))
 
 
 def main() -> int:
@@ -323,10 +295,10 @@ def main() -> int:
     validate_duplicate_rules()
     validate_rule_drift()
 
-    errors = [msg for level, msg in FINDINGS if level == "error"]
-    warnings = [msg for level, msg in FINDINGS if level == "warn"]
+    errors = REPORT.errors
+    warnings = REPORT.warnings
 
-    print("ASCOS validator — %d checks run" % len(CHECKS))
+    print("ASCOS validator — %d checks run" % len(REPORT.checks))
     if errors:
         print("\n✗ Errors (%d):" % len(errors))
         for msg in errors:

@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.1.2
+规则边界修补 —— 这是 v1.2 之前的**最后一次规则改动**，之后冻结规则，只做 Eval Harness。
+
+**修复**
+- **architecture 的两条硬判据缺适用边界**（判据过强会误伤正常重构）：
+  - *删除测试*：只适用于**已经存在的模块**。为需求引入的新模块，删除测试必然通过
+    （删了就没人调用），此时改用「接口即测试面」和「两个 adapter」判定 ——
+    没有已存在的第二个实现或第二个调用方，就先写成函数
+  - *一个 adapter 是假 seam*：只约束**对外接口 / 抽象**是否成立。
+    把 200 行函数拆成 3 个私有函数、把重复的 20 行抽成 helper，不产生新接口，
+    目的是降低认知负担，**不需要**满足"两个实现"
+- **root 补一条边界**：root 只描述**决策条件**，不描述**执行方法**。
+  「什么时候需要安全审查」在 root，「安全审查具体查什么」在 `references/security.md`；
+  「什么时候需要降级」在 root，「L0/L1/L2 每一级怎么判定」在 `skills/debugging/SKILL.md`
+
+**新增 / 改进**
+- **Rule Drift Detection 升级为显式 `CANONICAL_RULES`**（`scripts/validate_skill.py`）：
+  每条规则显式声明 `name` / `source` / `forbidden_duplicates`，语义是
+  「除 source 外，任何文件**同时**出现这些短语 = 复制了这条规则」。
+  原来的 `SOLE_SOURCE_RULES` 与 `FORBIDDEN_DRIFT` 两套机制合并为一套，
+  并新增「安全审查触发条件」一条（`references/security.md`）。
+  `references/worked-example.md` 与 `evals/README.md` 显式豁免：它们的作用是**示范与陈述期望**，
+  必然点名这些概念，不算第二事实来源
+- 工具链：抽出 `scripts/eval_common.py`（front-matter 解析 / 语料遍历 / 结果收集），
+  `validate_skill.py` 与后续 `eval_harness.py` 共用一份实现，避免两处漂移
+
 ## 1.1.1
 规则冲突修补，不重构。输入来自一次针对根 `SKILL.md` 与六个能力 Skill 的逐份复审。
 
