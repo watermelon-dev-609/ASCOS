@@ -12,6 +12,7 @@
 - [What is this](#what-is-this)
 - [Core features](#core-features)
 - [Workflow](#workflow)
+- [What's new in v1.1](#whats-new-in-v11)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Project structure](#project-structure)
@@ -80,6 +81,23 @@ Spec/PRD     ADR/API    TDD loop    root cause
 | Auth / payment / public API | `requirements` -> `architecture` (+`security`) -> `implementation` -> `verification` |
 
 Increased internal rigor should raise **output quality**, not **answer length**.
+
+---
+
+## What's new in v1.1
+
+v1.1 turns ASCOS from a single large skill into a compact orchestrator with six focused capability skills:
+
+- `requirements` completes incomplete requests and defines acceptance criteria.
+- `architecture` handles design boundaries, impact analysis and ADR-worthy decisions.
+- `implementation` keeps changes small, tested and aligned with the existing repository.
+- `debugging` follows an evidence ladder from reproducible failures to confidence-scoped analysis.
+- `code-review` checks the diff against both engineering standards and the user request.
+- `verification` requires real build, test or validation evidence before claiming completion.
+
+This release also adds a regression-evaluation suite, executable debugging fixtures, and a structural validator so future changes can be checked before release.
+
+See [`CHANGELOG.md`](CHANGELOG.md) and [`RELEASE_NOTES.md`](RELEASE_NOTES.md) for the full v1.1.0 release details.
 
 ---
 
