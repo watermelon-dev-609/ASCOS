@@ -1,4 +1,5 @@
 .workbuddy/
 .workbuddy-ai/
 eval-fixtures/**/logs/payments.log
+eval-scratch/
 

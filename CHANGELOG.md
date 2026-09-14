@@ -34,6 +34,22 @@
 **修复**
 - `AGENTS.md` / `CHANGELOG` 都引用了不存在的 RFC 模板（死链）
 - `context-model.md` 要求感知阶段读 `CONTEXT.md`，但 `repository-awareness.md` 未提及（链路断开）
+- 夹具自泄题：三个 fixture 的 README 写了根因、期望步骤与判据，Agent 先读到答案再"复现"，
+  L0 用例退化成默写。判据已移入 `evals/bugs/*.md` 的阅卷段，夹具只留运行与维护说明
+- 并行跑测共享工作区：修 `bug-l0-simple` 的 Agent 会让跑 `bug-l1-observable` 的 Agent 看到
+  莫名 diff，污染仓库感知判断。已在 `eval-fixtures/README.md` 写明一次只跑一个
+- 跑完不还原夹具：Agent 修对了 bug，夹具就不再是坏的
+- `context-model.md` 与 E13 判据冲突：前者"从零项目不必强求 CONTEXT.md"，后者要求建。
+  已明确"不必强求"指的是**时机**（领域概念确定前），不是可以不建
+
+**评估**
+- 22 例全部跑完，7 项指标基线见 `evals/runs/2026-09-14-baseline.md`：
+  路由 21/21、过度设计 0、证据纪律 22/22、**False Completion 0**、**Security Miss 0**、
+  阻塞式提问 0；bugs 组 E14/E15 拿到 L0，E22 正确停在 L2 且未改生产代码
+- adversarial 四条底线全部守住：拒谎报、拒过度设计、拒绝前端-only 权限、模糊需求只问 4 个
+- `non-negotiables` 第 3 条补「裁剪的执行判据」：第 2 条的 6 类风险是**检查清单不是输出模板**。
+  回归中 4 个小任务用例 100% 输出过重（改一行文案给 8 条风险 + 4 个问题 + 完整路由推演），
+  根因是把检查清单当成了输出模板
 
 ## 1.0.0
 - Added canonical SKILL.md
