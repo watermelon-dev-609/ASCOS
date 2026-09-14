@@ -1,3 +1,8 @@
+---
+name: supply-chain
+description: 依赖与供应链安全：新增依赖前的必要性、许可证、维护状态、已知漏洞与版本锁定评估。
+---
+
 # 依赖与供应链安全（Dependency & Supply Chain Security）— P1
 
 应用层安全之外，还需覆盖第三方依赖风险。

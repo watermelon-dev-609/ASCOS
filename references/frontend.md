@@ -1,3 +1,8 @@
+---
+name: frontend
+description: 前端知识：基础与业务组件拆分、Design Token、四态齐全、表单校验与防重复、XSS 与资源释放。
+---
+
 # 前端规范
 
 ## 组件

@@ -1,3 +1,8 @@
+---
+name: observability
+description: 可观测性知识：结构化日志、关联 ID、关键指标、依赖失败监控、健康检查、日志脱敏。
+---
+
 # 可观测性强化（Observability）— P2
 
 在已有日志与监控意识基础上进一步标准化。

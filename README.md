@@ -3,7 +3,7 @@
 > A software-development orchestration skill that turns incomplete user requirements into production-ready solutions through dynamic expert-role switching, first-principles reasoning, adversarial review, enterprise engineering standards, automated testing, review, and risk analysis.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.0-green.svg)](ascos.json)
+[![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)](ascos.json)
 
 ---
 
@@ -46,25 +46,38 @@ It codifies a proven engineering methodology into `SKILL.md`, with supporting re
 
 ## Workflow
 
+ASCOS is an **orchestrator, not a worker**: `SKILL.md` classifies the task, then routes to capability skills. It does not carry all the knowledge itself — its core ability is knowing *who to call*.
+
 ```text
 User intent
-  -> Repository awareness (existing project)
-  -> Requirement completeness check
-  -> First-principles analysis
-  -> Adversarial review
-  -> Requirement completion
-  -> Change-impact analysis
-  -> Dynamic role selection
-  -> Architecture / design / implementation
-  -> Testing / systematic debugging
-  -> Security review
-  -> Code review
-  -> Pre-completion verification (real build/test evidence)
-  -> Quality gate
-  -> Release / migration / rollback check (if deploying)
-  -> CTO final review
-  -> Delivery + risk list
+      |
+   ASCOS (orchestrator)
+      |
+  classify + size
+      |
+  Skill Router
+      |
+  +-----------+-----------+-----------+
+  |           |           |           |
+requirements  architecture  implementation  debugging
+  |           |           |           |
+  v           v           v           v
+Spec/PRD     ADR/API    TDD loop    root cause
+                           |
+                       code-review
+                           |
+                       verification -> delivery + risk list
 ```
+
+| Intent | Route |
+|--------|-------|
+| Vague / one-line request | `requirements` -> `implementation` |
+| New project | `requirements` -> `architecture` -> `implementation` |
+| New feature / page / API | `requirements` -> `implementation` -> `code-review` -> `verification` |
+| Bug / regression | `debugging` -> `code-review` -> `verification` |
+| Refactor / tech selection | `architecture` -> `implementation` -> `verification` |
+| Trivial UI text change | `implementation` -> `verification` |
+| Auth / payment / public API | `requirements` -> `architecture` (+`security`) -> `implementation` -> `verification` |
 
 Increased internal rigor should raise **output quality**, not **answer length**.
 
@@ -98,13 +111,22 @@ The skill is tool-agnostic: the `SKILL.md` contract works the same in Codex, Cur
 
 | Path | Description |
 |------|-------------|
-| `SKILL.md` | Canonical skill entry point and 17-step workflow (core file) |
+| `SKILL.md` | Canonical entry point: the orchestrator (trigger -> classify -> route -> accept) |
+| `skills/` | Six capability skills (**behaviour**: what to do now) — `requirements`, `architecture`, `implementation`, `debugging`, `code-review`, `verification` |
+| `references/` | Knowledge modules (**what to follow**): security, frontend, backend, database, testing, release, observability, roles, context-model, non-negotiables, engineering-standards… |
+| `templates/` | PRD, ADR, API_SPEC, TEST_PLAN, CONTEXT document templates |
+| `evals/` | 21 regression cases for the skill itself (small / medium / large / bugs / adversarial) |
+| `scripts/` | `validate_skill.py` — structural validator (front-matter, dead links, orphan skills, size) |
 | `agents/` | Codex UI metadata |
-| `references/` | Role, architecture, frontend, backend, database, security, testing, quality-gate, repository-awareness, change-impact, verification, debugging, definition-of-done and more reference modules |
-| `templates/` | PRD, ADR, API_SPEC, TEST_PLAN document templates |
 | `ascos.json` | Skill metadata |
 | `AGENTS.md` | Agent entry-point guidance |
 | `CHANGELOG.md` | Change history |
+
+Run the validator before committing:
+
+```bash
+python scripts/validate_skill.py --strict
+```
 
 ---
 
@@ -152,6 +174,6 @@ This project is open source under the [MIT License](LICENSE).
 
 ## Version
 
-Current version: **v1.0.0**
+Current version: **v1.1.0**
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the change history.

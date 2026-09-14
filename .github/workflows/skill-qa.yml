@@ -1,0 +1,26 @@
+name: skill-qa
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Validate skill structure
+        run: python scripts/validate_skill.py --strict
+
+      - name: Report eval inventory
+        run: |
+          echo "eval cases: $(find evals -name '*.md' ! -name 'README.md' | wc -l)"
+          echo "capability skills: $(find skills -name SKILL.md | wc -l)"
+          echo "knowledge references: $(ls references/*.md | wc -l)"

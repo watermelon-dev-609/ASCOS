@@ -1,6 +1,6 @@
 interface:
   display_name: "AI Software Company Skill"
-  short_description: "Production-minded software engineering workflow for Codex."
+  short_description: "Software-dev orchestrator: classifies the task, routes it to requirements / architecture / implementation / debugging / code-review / verification, then delivers with real evidence and a risk list."
   default_prompt: "Use $ai-software-company-skill to plan, implement, test and review this software task."
 
 policy:

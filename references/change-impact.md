@@ -1,3 +1,8 @@
+---
+name: change-impact
+description: 变更影响分析清单：API、数据字段、权限、公共组件、配置五类改动的波及面与输出物。
+---
+
 # 变更影响分析（Change Impact Analysis）— P0
 
 补全需求后、动手前，明确「改这一处会影响哪些地方」，防止局部改动引发全局回归。

@@ -1,3 +1,8 @@
+---
+name: research-freshness
+description: 技术事实新鲜度：易变事实（版本 / API / 弃用 / 安全）的查证优先级与做法。
+---
+
 # 技术事实新鲜度（Research & Freshness）— P1
 
 涉及快速变化的技术信息时，不能仅凭模型记忆做决策。

@@ -1,3 +1,8 @@
+---
+name: artifact-continuity
+description: 文档链路连续性：PRD → ADR → API_SPEC → TEST_PLAN 的上下游关系与同步规则。
+---
+
 # 文档连续性（Artifact Continuity）— P1
 
 PRD、ADR、API_SPEC、TEST_PLAN 不是互相独立的文件，而是上下游链路。
