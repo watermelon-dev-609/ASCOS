@@ -36,6 +36,12 @@ T01 触发后仍正确**不产出** PRD / ADR / TEST_PLAN —— 触发不等于
 存到 `evals/results/round4-5-prefix.jsonl` —— Round 6 复用 run 1/2/3，
 直接覆盖会把两个不同配置的数据混在一起。
 
+**阶段 1 收口（本次不升版本）**：触发与边界稳定性验证到此**完成并冻结**，
+结论固化在 [`STAGE-1-ACCEPTANCE.md`](STAGE-1-ACCEPTANCE.md)。
+`description` 不再改动，除非出现稳定失败模式（同一用例 ≥2 次有效观测同向失败）。
+per-skill eval、forced-activation、E01–E22、`seconds`/`tokens`、新规则 / 新 Skill /
+新 Router 逻辑**全部留给下一阶段**，本阶段不碰。
+
 ## 1.2.1 — 触发评测的装载方式修正
 不新增规则，只修正「怎么测触发」——以及撤回一个基于错误测量得出的结论。
 

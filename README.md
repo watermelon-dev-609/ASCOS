@@ -168,6 +168,12 @@ python scripts/eval_harness.py report --k 1 3     # evals/results/report.md
 
 Recorded runs live in `evals/runs/`, raw records in `evals/results/records.jsonl`.
 
+**Stage 1 (triggering & boundary stability) is complete and frozen at v1.2.2** —
+see [`STAGE-1-ACCEPTANCE.md`](STAGE-1-ACCEPTANCE.md). The `description` is no longer
+changed unless new evidence shows a stable failure mode (≥2 valid runs failing in the
+same direction). Per-skill evals, forced-activation robustness, the behaviour cases,
+and token/latency measurement are explicitly deferred to the next stage.
+
 | Run | What it measured | Result |
 |---|---|---|
 | Round 6 · description fix | Full 20-case regression after the fix below | must-fire **12/12** (T01 3/3); must-not-fire **30/30, zero misfires** |
