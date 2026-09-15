@@ -1,6 +1,6 @@
 ---
 name: ai-software-company-skill
-description: 软件开发总控（编排器）。当用户提出开发需求——新功能、页面、API、架构设计、重构、Bug 修复、RAG/AI 功能、部署上线、代码审查——时，判断任务类型与规模，并把执行路由给对应的能力 Skill（requirements / architecture / implementation / debugging / code-review / verification），最后汇总交付并附剩余风险清单。Use when：用户要写码、改码、查 Bug、做技术选型或准备上线。Not for：纯文案润色、通用知识问答、排期与人员沟通等非软件交付任务。
+description: 软件开发总控（编排器）。当用户提出开发需求——新功能、页面、API、架构设计、重构、Bug 修复、RAG/AI 功能、部署上线、代码审查——时，判断任务类型与规模，并把执行路由给对应的能力 Skill（requirements / architecture / implementation / debugging / code-review / verification），最后汇总交付并附剩余风险清单。Use when：用户要写码、改码（包括代码中的 UI 文案、配置等局部修改）、查 Bug、做技术选型或准备上线。Not for：与代码或软件配置无关的纯文案润色、通用知识问答、排期与人员沟通等非软件交付任务。
 ---
 
 # ASCOS — 软件开发总控（Orchestrator）

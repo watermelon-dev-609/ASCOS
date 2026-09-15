@@ -68,16 +68,25 @@ python scripts/eval_harness.py report --k 1 3          # → evals/results/repor
 尤其在忠实装载（只暴露 `name + description`、触发时才加载正文）下，
 模型说出"这个不适用"恰恰是**正确完成了负向路由判断**。
 
-**Activation evidence（命中 / 误触发）**
-1. 明确声明正在使用、或已进入 ASCOS / 某个 capability Skill；
-2. 明确给出 ASCOS capability 的**正向**调用 / 路由链；
-3. 输出 ASCOS 特有交付物（PRD / ADR / TEST_PLAN / DoD / 剩余风险清单 / 变更影响清单）；
-4. `requirements` / `architecture` 特有的「补全 + 分叉点追问」形态。
+**Primary evidence —— 满足任一即可判 `fire`**
+1. 明确声明已加载、正在遵循或正在使用 ASCOS / `SKILL.md`；
+2. 明确进入 ASCOS capability Skill，或给出**正向**路由链；
+3. 出现 `requirements` / `architecture` 等高度特异的 ASCOS 行为形态。
+
+**Supporting evidence —— 仅可佐证，不能单独判 `fire`**
+- PRD / ADR / DoD / 剩余风险清单 / 验证清单等交付物；
+- 一般性的风险分析、测试建议、工程清单。
+
+> **ASCOS 特有交付物只能作为 activation corroboration，不能单独构成 activation evidence.**
+> 裸模型也能自然生成一张风险表或一个小标题。按交付物**名字**匹配会把
+> 「明确拒绝使用 Skill、却顺手写了个风险清单」误判成激活 ——
+> 这个歧义在 T01 run 2 上真实发生过。交付物必须与 Primary evidence 同时出现才算数。
 
 **Not activation evidence（不算命中，也不算误触发）**
-- 仅说明 ASCOS / 某 Skill **不适用**于该请求；
-- 仅说明将直接回答；
-- 仅引用 Skill 名称来解释**为什么不使用它**。
+- 明确说明 ASCOS / 某 Skill **不适用**于当前请求；
+- 明确说明**未加载** Skill 或直接回答；
+- 仅引用 Skill 名称来解释**为什么不使用它**；
+- 裸模型也可能自然生成的**单个**工程交付物或标题。
 
 > **Negative routing statement is not activation evidence.**
 > 只说"该任务不属于 ASCOS / 不走开发编排 Skill / 直接回答即可"，且没有加载或声称遵循
@@ -95,9 +104,14 @@ python scripts/eval_harness.py report --k 1 3          # → evals/results/repor
 | **误触发**（must-not-fire） | 同一用例 3 次中 **≥2 次误触发** → 候选修复队列；1/3 → observe；0 → 无需处理 |
 | **欠触发**（must-fire） | 同一用例 3 次中 **≥2 次未触发** → 候选修复队列；1/3 → observe；0 → 无需处理 |
 | **跨用例** | 不同用例出现**相同 `misfire_shape`** → 视为系统性边界问题，即使单例只有 1 次也可进候选 |
-| **不可测** | `invalid` 不进分母，清理污染后补跑 |
+| **有效样本** | **≥2 valid runs** → 按 valid runs 判稳定性；**<2 valid runs** → `inconclusive`，**不进命中率、不进修复队列** |
 
 两个方向用同一个形状，是为了避免"看完数据才决定门槛在哪边"。
+
+`invalid` 只说明"这一跑没测到东西"，不等于"这一跑算失败"。
+但**有效观测不足 2 次时给不出任何稳定性判断** —— T05 曾有 2 次 `invalid` + 1 次有效，
+那个 1 次既不能算 1/3 也不能算 0/1，只能记为 `inconclusive`。
+否则 `invalid` 就从"抽屉"变成"用单次观测冒充结论"。
 
 ### 三条硬边界
 1. `## 输入` 里的 `>` 引用块是**阅卷备注**，导出 prompt 时会被剔除 ——

@@ -190,6 +190,46 @@ class ObservationTagTests(unittest.TestCase):
         self.assertNotIn("misfire", joined.lower().replace("misfires", ""))
 
 
+class LoadedFieldTests(unittest.TestCase):
+    """`loaded` records whether the run opened SKILL.md.
+
+    Rubric revisions keep moving "does this answer look like activation";
+    "did the run open the file" does not, so it is the safety signal that
+    stays comparable across rounds.
+    """
+
+    def test_yes_and_no_are_the_only_values(self):
+        self.assertEqual(sorted(eval_harness.LOADED), ["no", "yes"])
+
+    def test_known_value_is_accepted(self):
+        report = check([{"case": "T13", "variant": "with_skill", "run": 1,
+                         "verdict": "not_fire", "misfire_shape": "none",
+                         "loaded": "no"}], T13)
+        self.assertFalse(report.errors)
+
+    def test_unknown_value_is_rejected(self):
+        report = check([{"case": "T13", "variant": "with_skill", "run": 1,
+                         "verdict": "not_fire", "misfire_shape": "none",
+                         "loaded": "maybe"}], T13)
+        self.assertTrue(report.errors)
+
+    def test_section_stays_empty_when_nobody_recorded_it(self):
+        by_case = {"T13": {"with_skill": [
+            {"case": "T13", "variant": "with_skill", "run": 1,
+             "verdict": "not_fire", "misfire_shape": "none"}]}}
+        self.assertEqual(eval_harness._loaded_section({"T13": {"expect": "not_fire"}},
+                                                      by_case), [])
+
+    def test_section_groups_by_expectation_so_the_safety_half_is_visible(self):
+        by_case = {"T13": {"with_skill": [
+            {"case": "T13", "variant": "with_skill", "run": 1,
+             "verdict": "not_fire", "misfire_shape": "none", "loaded": "yes"}]}}
+        joined = "\n".join(eval_harness._loaded_section(
+            {"T13": {"expect": "not_fire"}}, by_case))
+        self.assertIn("not_fire", joined)
+        self.assertIn("| 1 |", joined)
+
+
 class VerdictTypeTests(unittest.TestCase):
     def test_trigger_verdicts_on_trigger_case(self):
         report = check([{"case": "T01", "variant": "with_skill", "run": 1,

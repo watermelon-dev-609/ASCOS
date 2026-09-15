@@ -67,6 +67,12 @@ MISFIRE_SHAPES = ("none", "risk-tail", "router-language", "PRD-overreach",
 # won't trigger" from scoring worse than saying nothing.
 OBSERVATIONS = ("negative-routing",)
 
+# Did this run actually load SKILL.md? Reported by the run itself, and it is a
+# *behaviour*, not an output shape — so it stays usable when the activation
+# rubric changes. Rubric revisions keep making "did it fire" harder to compare
+# across rounds; "did it open the file" does not move.
+LOADED = ("yes", "no")
+
 MIN_FIRE = 10  # the corpus must keep 10 must-fire / 10 must-not-fire or it
 MIN_NOT_FIRE = 10  # stops being able to detect either kind of trigger failure
 
@@ -210,6 +216,11 @@ def records_check(report: Report, cases: list[dict]) -> None:
         if obs is not None:
             report.check(obs in OBSERVATIONS, "%s uses a known observation tag" % label,
                          "one of %s, got %r" % (OBSERVATIONS, obs))
+
+        loaded = rec.get("loaded")
+        if loaded is not None:
+            report.check(loaded in LOADED, "%s uses a known loaded value" % label,
+                         "one of %s, got %r" % (LOADED, loaded))
 
 
 # --- records --------------------------------------------------------------
@@ -366,6 +377,8 @@ def cmd_ingest(args) -> int:
         if rec.get("observation") is not None and rec.get("observation") not in OBSERVATIONS:
             errors.append("#%d: observation must be one of %s"
                           % (i, OBSERVATIONS))
+        if rec.get("loaded") is not None and rec.get("loaded") not in LOADED:
+            errors.append("#%d: loaded must be one of %s" % (i, LOADED))
         key = (rec.get("case"), rec.get("variant"), rec.get("run"))
         if key in index and not args.replace:
             errors.append("#%d: %s run %s already recorded (use --replace)"
@@ -463,6 +476,36 @@ def _observation_section(by_case: dict) -> list[str]:
     return out
 
 
+def _loaded_section(cases: dict[str, dict], by_case: dict) -> list[str]:
+    """How many runs actually opened SKILL.md.
+
+    A rubric decides whether an *answer* looks like activation, so every rubric
+    revision silently moves that number. Loading the file is a behaviour the
+    run either performed or did not, which makes the must-not-fire half of
+    this table a safety check that survives a rubric change.
+    """
+    tally: dict[tuple[str, str], int] = {}
+    recorded = 0
+    for cid in sorted(by_case):
+        expect = cases.get(cid, {}).get("expect", "?")
+        for variant in VARIANTS:
+            for rec in by_case[cid].get(variant, []):
+                if rec.get("loaded") in LOADED:
+                    recorded += 1
+                if rec.get("loaded") == "yes":
+                    tally[(expect, variant)] = tally.get((expect, variant), 0) + 1
+    if not recorded:
+        return []
+    out = ["## Loaded SKILL.md (behaviour, not an output judgement)", ""]
+    out.append("| expectation | variant | runs that loaded |")
+    out.append("|---|:--:|:--:|")
+    for key in sorted(tally):
+        out.append("| %s | %s | %d |" % (key[0], key[1], tally[key]))
+    out += ["", "%d record(s) carry a `loaded` value; the rest were recorded "
+                "before the field existed." % recorded, ""]
+    return out
+
+
 def cmd_report(args) -> int:
     cases = {c["id"]: c for c in load_cases() if c.get("id")}
     records = load_records()
@@ -522,6 +565,7 @@ def cmd_report(args) -> int:
     if misfire:
         lines += misfire
     lines += _observation_section(by_case)
+    lines += _loaded_section(cases, by_case)
     if invalids:
         lines += ["## Not measurable (excluded from every rate)", "",
                   "| case | variant | run | reason |", "|---|:--:|:--:|---|"]
