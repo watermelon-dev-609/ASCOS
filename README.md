@@ -3,7 +3,7 @@
 > A software-development orchestration skill that turns incomplete user requirements into production-ready solutions through dynamic expert-role switching, first-principles reasoning, adversarial review, enterprise engineering standards, automated testing, review, and risk analysis.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.2.1-green.svg)](ascos.json)
+[![Version](https://img.shields.io/badge/Version-1.2.2-green.svg)](ascos.json)
 
 ---
 
@@ -170,8 +170,19 @@ Recorded runs live in `evals/runs/`, raw records in `evals/results/records.jsonl
 
 | Run | What it measured | Result |
 |---|---|---|
+| Round 6 · description fix | Full 20-case regression after the fix below | must-fire **12/12** (T01 3/3); must-not-fire **30/30, zero misfires** |
+| Round 5 · must-fire rerun | Runs 2–3 of the 10 must-fire cases, to see whether the under-triggers were noise | **T01 3/3** under-trigger (real gap); T08 1/3 (observe); must-fire 85.2% |
 | Round 4 · faithful arm | Does ASCOS fire when it should, and stay out when it shouldn't? 3 passes over the 10 near-miss cases | must-not-fire **30/30, zero misfires**; must-fire 7/10 |
 | Round 3 · forced arm | Same suite, but `SKILL.md` force-loaded — measures "ASCOS always on", **not** triggering | must-fire 10/10; must-not-fire 2/10 |
+
+Two rubric rules were tightened before Round 6 and are part of what the numbers
+mean, so they belong here rather than in a footnote:
+
+- An ASCOS deliverable is **corroboration only**. A bare model can emit a
+  `剩余风险清单`; only a primary signal (declared load, routing chain, or a
+  capability-specific behaviour shape) can carry a fire verdict.
+- **Fewer than 2 valid runs is inconclusive**, not a rate. One observation
+  cannot support a stability claim in either direction.
 
 **Read the delta with care.** On must-fire cases the with/without delta is partly
 true by construction — an arm with no ASCOS cannot fire — so it shows the arms were
@@ -231,6 +242,6 @@ This project is open source under the [MIT License](LICENSE).
 
 ## Version
 
-Current version: **v1.2.1**
+Current version: **v1.2.2**
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the change history.

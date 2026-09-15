@@ -1,0 +1,60 @@
+{"case": "T01", "note": "miss: answered as plain assistant, no sizing/route/ASCOS deliverable", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T02", "note": "sized 中+security, route requirements→architecture→implementation→verification", "run": 1, "variant": "with_skill", "verdict": "fire"}
+{"case": "T03", "note": "route debugging, falsifiable hypotheses, wants red feedback loop first", "run": 1, "variant": "with_skill", "verdict": "fire"}
+{"case": "T04", "note": "sized 大, route requirements→architecture→implementation→verification", "run": 1, "variant": "with_skill", "verdict": "fire"}
+{"case": "T05", "note": "run1 (round 4): hijacked by the host's weixinpay connector — the answer opened the 开通/绑定 flow before ASCOS could ever be evaluated", "run": 1, "variant": "with_skill", "verdict": "invalid"}
+{"case": "T06", "note": "sized 大, route architecture→implementation→verification", "run": 1, "variant": "with_skill", "verdict": "fire"}
+{"case": "T07", "note": "sized 小, route implementation", "run": 1, "variant": "with_skill", "verdict": "fire"}
+{"case": "T08", "note": "miss: produced a plain review with no structural ASCOS signal", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T09", "note": "route debugging, evidence-graded, refused to guess without evidence", "run": 1, "variant": "with_skill", "verdict": "fire"}
+{"case": "T10", "note": "named the orchestrator skill and its process", "run": 1, "variant": "with_skill", "verdict": "fire"}
+{"case": "T11", "misfire_shape": "none", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T12", "misfire_shape": "none", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T13", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T14", "misfire_shape": "none", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T15", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T16", "misfire_shape": "none", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T17", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T18", "misfire_shape": "none", "note": "run-1 pilot misfired here (risk-tail); did not reproduce", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T19", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T20", "misfire_shape": "none", "note": "run-1 pilot misfired here (risk-tail); did not reproduce", "run": 1, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T11", "misfire_shape": "none", "run": 2, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T12", "misfire_shape": "none", "run": 2, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T13", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 2, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T14", "misfire_shape": "none", "run": 2, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T15", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 2, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T16", "misfire_shape": "none", "run": 2, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T17", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 2, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T18", "misfire_shape": "none", "run": 2, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T19", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 2, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T20", "misfire_shape": "none", "run": 2, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T11", "misfire_shape": "none", "run": 3, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T12", "misfire_shape": "none", "run": 3, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T13", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 3, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T14", "misfire_shape": "none", "run": 3, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T15", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 3, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T16", "misfire_shape": "none", "run": 3, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T17", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 3, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T18", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 3, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T19", "misfire_shape": "none", "note": "negative routing statement: declined the skill by name, no sizing, no chain", "observation": "negative-routing", "run": 3, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T20", "misfire_shape": "none", "run": 3, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T01", "note": "run2: declined by name ('不启动 ai-software-company-skill 编排器'), citing Not for 纯文案润色; a generic risk table is present but there is no sizing and no routing chain", "observation": "negative-routing", "run": 2, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T02", "note": "run2: routed to requirements, emitted the contract's failure state (阻断性待确认清单)", "run": 2, "variant": "with_skill", "verdict": "fire"}
+{"case": "T03", "note": "run2: named chain debugging → code-review → verification, sized 中 (支付链路强制安全审查)", "run": 2, "variant": "with_skill", "verdict": "fire"}
+{"case": "T04", "note": "run2: ASCOS intake, sized 大, chain requirements → architecture → implementation → verification", "run": 2, "variant": "with_skill", "verdict": "fire"}
+{"case": "T05", "note": "run2: host weixinpay connector in scope; routing was decided by '专用技能优先于通用编排器' over weixinpay-register — a host-specific reason, not an ASCOS judgement", "run": 2, "variant": "with_skill", "verdict": "invalid"}
+{"case": "T06", "note": "run2: named the ASCOS orchestrator, sized 大, held at architecture fork questions", "run": 2, "variant": "with_skill", "verdict": "fire"}
+{"case": "T07", "note": "run2: ASCOS delivery summary, sized 中, chain requirements → implementation → code-review → verification", "run": 2, "variant": "with_skill", "verdict": "fire"}
+{"case": "T08", "note": "run2: loaded SKILL.md, emitted '路由结果（按 ASCOS 总控判定）' with chain code-review → verification, the two-axis Standards/Spec review contract, DoD and 剩余风险清单", "run": 2, "variant": "with_skill", "verdict": "fire"}
+{"case": "T09", "note": "run2: chain debugging → code-review → verification, evidence-first stop at debugging intake", "run": 2, "variant": "with_skill", "verdict": "fire"}
+{"case": "T10", "note": "run2: ASCOS orchestrator delivery note with sizing, chain and 剩余风险清单", "run": 2, "variant": "with_skill", "verdict": "fire"}
+{"case": "T01", "note": "run3: declined ('未加载 ai-software-company-skill'), judged a string-level replacement with zero architecture impact", "observation": "negative-routing", "run": 3, "variant": "with_skill", "verdict": "not_fire"}
+{"case": "T02", "note": "run3: 'ASCOS 交付记录' with an explicit 触发判定 and 大 sizing", "run": 3, "variant": "with_skill", "verdict": "fire"}
+{"case": "T03", "note": "run3: named the orchestrator as the routing source, chain debugging → code-review → verification", "run": 3, "variant": "with_skill", "verdict": "fire"}
+{"case": "T04", "note": "run3: named ASCOS, sized 大, held at requirements with fork questions", "run": 3, "variant": "with_skill", "verdict": "fire"}
+{"case": "T05", "note": "run3: ASCOS fired — 受理单 with 分级 ('支付' → 至少中), routing chain, ADR/变更影响清单/剩余风险清单. The host connector injected a spurious '开通 AI 专属卡' branch but it did not change the routing outcome, so the run stayed measurable", "run": 3, "variant": "with_skill", "verdict": "fire"}
+{"case": "T06", "note": "run3: named ASCOS routing architecture → implementation → verification, held on missing repo context", "run": 3, "variant": "with_skill", "verdict": "fire"}
+{"case": "T07", "note": "run3: orchestrator routing chain + 中 sizing + 事实/假设 boundary", "run": 3, "variant": "with_skill", "verdict": "fire"}
+{"case": "T08", "note": "run3: '按总控路由表归类' → chain code-review → verification; contract failure state on missing diff/base quoting SKILL.md", "run": 3, "variant": "with_skill", "verdict": "fire"}
+{"case": "T09", "note": "run3: named the triggered skill, routing decision + evidence checklist + ranked hypotheses", "run": 3, "variant": "with_skill", "verdict": "fire"}
+{"case": "T10", "note": "run3: stated it executed under ai-software-company-skill, with sizing, routing and 剩余风险清单", "run": 3, "variant": "with_skill", "verdict": "fire"}

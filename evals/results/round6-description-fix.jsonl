@@ -1,0 +1,42 @@
+{"case": "T01", "variant": "with_skill", "run": 1, "verdict": "fire", "loaded": "yes", "note": "sized 小, chain implementation → verification citing the routing table's '简单 UI 文案或样式修改'; explicitly '不产出 PRD / ADR / TEST_PLAN' — fired without over-engineering"}
+{"case": "T01", "variant": "with_skill", "run": 2, "verdict": "fire", "loaded": "yes", "note": "'已加载 SKILL.md（ai-software-company-skill）' + 判断/路由/执行/验收 四阶段 + sizing table"}
+{"case": "T01", "variant": "with_skill", "run": 3, "verdict": "fire", "loaded": "yes", "note": "'改代码中的 UI 文案属于「改码」，所以加载了 SKILL.md' — the new wording is what did it; sized 小, chain implementation → verification"}
+{"case": "T02", "variant": "with_skill", "run": 1, "verdict": "fire", "loaded": "yes", "note": "routed + requirements failure state, blocking questions before any code"}
+{"case": "T03", "variant": "with_skill", "run": 1, "verdict": "fire", "loaded": "yes", "note": "chain debugging → code-review → verification, sized at least 中 (下单链路)"}
+{"case": "T04", "variant": "with_skill", "run": 1, "verdict": "fire", "loaded": "yes", "note": "chain requirements → architecture → implementation → verification, sized 大"}
+{"case": "T05", "variant": "with_skill", "run": 1, "verdict": "fire", "loaded": "yes", "note": "CLEAN RUN — zero connector traces (no weixinpay / 开通 / AI 专属卡 anywhere); sized 至少中, chain requirements → architecture → implementation → verification"}
+{"case": "T06", "variant": "with_skill", "run": 1, "verdict": "fire", "loaded": "yes", "note": "sized 大 (架构重构), held on architecture fork questions"}
+{"case": "T07", "variant": "with_skill", "run": 1, "verdict": "fire", "loaded": "yes", "note": "sized 中, chain requirements → implementation → code-review → verification"}
+{"case": "T08", "variant": "with_skill", "run": 1, "verdict": "fire", "loaded": "yes", "note": "'是否命中本 Skill | 命中' + chain code-review → verification; contract failure state on missing diff/base"}
+{"case": "T09", "variant": "with_skill", "run": 1, "verdict": "fire", "loaded": "yes", "note": "chain debugging → code-review → verification, evidence-first intake"}
+{"case": "T10", "variant": "with_skill", "run": 1, "verdict": "fire", "loaded": "yes", "note": "sized 中偏大, chain requirements → architecture → implementation → verification, 事实/假设/建议 boundary"}
+{"case": "T11", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "answered the SQL tutorial directly, no skill mention"}
+{"case": "T11", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "answered the SQL tutorial directly, no skill mention"}
+{"case": "T11", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "answered the SQL tutorial directly, no skill mention"}
+{"case": "T12", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "explained the concept directly; ASCOS's own vocabulary in the question did not pull the skill in"}
+{"case": "T12", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "explained the concept directly, no skill mention"}
+{"case": "T12", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "explained the concept directly, no skill mention"}
+{"case": "T13", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name, quoting the new Not for clause ('与代码或软件配置无关的纯文案润色')"}
+{"case": "T13", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name, quoting the new Not for clause"}
+{"case": "T13", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name, quoting the new Not for clause"}
+{"case": "T14", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name ('与 ai-software-company-skill 的适用范围不匹配，没有加载该 Skill'), then wrote the email"}
+{"case": "T14", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name ('没有加载 ai-software-company-skill'), then wrote the email"}
+{"case": "T14", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name ('没有加载软件开发总控 Skill'), then wrote the email"}
+{"case": "T15", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name ('未加载 ai-software-company-skill') with an explicit reason list"}
+{"case": "T15", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name; flags the in-repo-docs edge case without routing into the skill"}
+{"case": "T15", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name ('没有调用 ai-software-company-skill')"}
+{"case": "T16", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "answered the git question directly, no skill mention"}
+{"case": "T16", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "answered the git question directly, no skill mention"}
+{"case": "T16", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name ('没有加载 ai-software-company-skill（该 Skill 明确不适用于「通用知识问答」）')"}
+{"case": "T17", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name ('我没有加载 ai-software-company-skill，而是直接回答了你')"}
+{"case": "T17", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name with a '为什么没有加载技能' section"}
+{"case": "T17", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name ('我没有加载 ai-software-company-skill 这个软件开发编排技能——它不适用')"}
+{"case": "T18", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "named the project directly; no risk tail, no skill mention"}
+{"case": "T18", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "named the project directly; no risk tail, no skill mention"}
+{"case": "T18", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "named the project directly; no risk tail, no skill mention"}
+{"case": "T19", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name ('未加载 ai-software-company-skill')"}
+{"case": "T19", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name ('这次我没有加载 ai-software-company-skill，直接回答')"}
+{"case": "T19", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "observation": "negative-routing", "note": "declined by name ('不在 ai-software-company-skill 的适用范围内…未加载该 Skill')"}
+{"case": "T20", "variant": "with_skill", "run": 1, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "answered the axios question directly; no risk tail, no skill mention"}
+{"case": "T20", "variant": "with_skill", "run": 2, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "answered the axios question directly; no risk tail, no skill mention"}
+{"case": "T20", "variant": "with_skill", "run": 3, "verdict": "not_fire", "misfire_shape": "none", "loaded": "no", "note": "answered the axios question directly; no risk tail, no skill mention"}
