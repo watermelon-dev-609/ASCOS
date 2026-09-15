@@ -56,8 +56,48 @@ python scripts/eval_harness.py report --k 1 3          # → evals/results/repor
 |---|---|
 | `variant` | `with_skill` / `without_skill`，用来算 **Behaviour Delta**（带不带 Skill 的命中率差） |
 | `run` | 同一用例第几次跑，用来算 **pass@k** |
-| `verdict` | 行为用例 `pass` / `fail`；触发用例 `fire` / `not_fire` |
+| `verdict` | 行为用例 `pass` / `fail`；触发用例 `fire` / `not_fire`；任一用例都可记 `invalid` |
+| `invalid` | 这一跑**没测到该用例要测的东西**（例如环境里的其他连接器把请求截走了）。**不进任何分母**，且**必须**在 `note` 里写原因 —— 否则 `invalid` 会变成扫走不利结果的抽屉 |
+| `misfire_shape` | 仅 must-not-fire 用例必填；只描述**已成立的误触发**长什么样 |
+| `observation` | 非误触发的观察标签（如 `negative-routing`）。**不进误触发统计** |
 | `seconds` / `tokens` | 可选，用于成本对比（ASCOS 变强但把 token 翻倍，也值得知道） |
+
+## 触发判定：什么是"激活"，什么不是
+
+触发用例测的是 **Skill 有没有被激活**，不是**模型有没有提到 Skill**。
+尤其在忠实装载（只暴露 `name + description`、触发时才加载正文）下，
+模型说出"这个不适用"恰恰是**正确完成了负向路由判断**。
+
+**Activation evidence（命中 / 误触发）**
+1. 明确声明正在使用、或已进入 ASCOS / 某个 capability Skill；
+2. 明确给出 ASCOS capability 的**正向**调用 / 路由链；
+3. 输出 ASCOS 特有交付物（PRD / ADR / TEST_PLAN / DoD / 剩余风险清单 / 变更影响清单）；
+4. `requirements` / `architecture` 特有的「补全 + 分叉点追问」形态。
+
+**Not activation evidence（不算命中，也不算误触发）**
+- 仅说明 ASCOS / 某 Skill **不适用**于该请求；
+- 仅说明将直接回答；
+- 仅引用 Skill 名称来解释**为什么不使用它**。
+
+> **Negative routing statement is not activation evidence.**
+> 只说"该任务不属于 ASCOS / 不走开发编排 Skill / 直接回答即可"，且没有加载或声称遵循
+> `SKILL.md`、没有调用 capability Skill、没有 ASCOS 特有交付物时，判 `not_fire`，
+> 并在 `observation` 记 `negative-routing`。
+>
+> 理由：若规定"只要出现 Skill 两个字就算触发"，模型越清楚地解释"我为什么不触发"
+> 反而越容易被判成误触发 —— 那是在惩罚**可观察的路由决策**，
+> 而我们要测的是**真正的激活**。
+
+## 修复阈值（对称，跑之前写死）
+
+| 方向 | 阈值 |
+|---|---|
+| **误触发**（must-not-fire） | 同一用例 3 次中 **≥2 次误触发** → 候选修复队列；1/3 → observe；0 → 无需处理 |
+| **欠触发**（must-fire） | 同一用例 3 次中 **≥2 次未触发** → 候选修复队列；1/3 → observe；0 → 无需处理 |
+| **跨用例** | 不同用例出现**相同 `misfire_shape`** → 视为系统性边界问题，即使单例只有 1 次也可进候选 |
+| **不可测** | `invalid` 不进分母，清理污染后补跑 |
+
+两个方向用同一个形状，是为了避免"看完数据才决定门槛在哪边"。
 
 ### 三条硬边界
 1. `## 输入` 里的 `>` 引用块是**阅卷备注**，导出 prompt 时会被剔除 ——

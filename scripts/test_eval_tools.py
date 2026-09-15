@@ -16,10 +16,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import eval_common  # noqa: E402
 import eval_harness  # noqa: E402
 
-MUST_NOT_FIRE = [{"id": "T11", "group": "trigger", "expect": "not_fire",
-                  "_rel": "evals/triggers/11.md"}]
-MUST_FIRE = [{"id": "T01", "group": "trigger", "expect": "fire",
-              "_rel": "evals/triggers/01.md"}]
+def trigger_case(cid, expect):
+    return [{"id": cid, "group": "trigger", "expect": expect,
+             "_rel": "evals/triggers/%s.md" % cid.lower()}]
+
+
+MUST_NOT_FIRE = trigger_case("T11", "not_fire")
+MUST_FIRE = trigger_case("T01", "fire")
+T13 = trigger_case("T13", "not_fire")
+T05 = trigger_case("T05", "fire")
 
 
 def check(records, cases):
@@ -121,6 +126,68 @@ class MisfireShapeTests(unittest.TestCase):
                          "verdict": "not_fire", "misfire_shape": "none"}],
                        MUST_NOT_FIRE)
         self.assertFalse(report.errors)
+
+
+class InvalidRunTests(unittest.TestCase):
+    """An invalid run measured the environment, not the skill, so it must not
+    reach any denominator — and it must say why, or "invalid" becomes a drawer
+    to sweep inconvenient results into."""
+
+    def test_invalid_without_a_reason_is_rejected(self):
+        report = check([{"case": "T05", "variant": "with_skill", "run": 1,
+                         "verdict": "invalid"}], T05)
+        self.assertTrue(report.errors)
+
+    def test_invalid_with_a_reason_is_accepted(self):
+        report = check([{"case": "T05", "variant": "with_skill", "run": 1,
+                         "verdict": "invalid",
+                         "note": "weixinpay connector hijacked the request"}], T05)
+        self.assertFalse(report.errors)
+
+    def test_invalid_carries_no_shape(self):
+        report = check([{"case": "T11", "variant": "with_skill", "run": 1,
+                         "verdict": "invalid", "note": "environment",
+                         "misfire_shape": "risk-tail"}], MUST_NOT_FIRE)
+        self.assertTrue(report.errors)
+
+    def test_invalid_is_excluded_from_the_hit_rate(self):
+        section = eval_harness._misfire_section(
+            {}, {"T11": {"with_skill": [
+                {"case": "T11", "variant": "with_skill", "run": 1,
+                 "verdict": "invalid", "note": "env"}]}})
+        self.assertEqual(section, [])
+
+
+class ObservationTagTests(unittest.TestCase):
+    """Saying why you will NOT trigger is the routing decision being legible.
+    It is the opposite of a misfire, so it must live outside misfire_shape."""
+
+    def test_negative_routing_is_a_known_tag(self):
+        self.assertIn("negative-routing", eval_harness.OBSERVATIONS)
+
+    def test_known_tag_is_accepted(self):
+        report = check([{"case": "T13", "variant": "with_skill", "run": 1,
+                         "verdict": "not_fire", "misfire_shape": "none",
+                         "observation": "negative-routing"}], T13)
+        self.assertFalse(report.errors)
+
+    def test_unknown_tag_is_rejected(self):
+        report = check([{"case": "T13", "variant": "with_skill", "run": 1,
+                         "verdict": "not_fire", "misfire_shape": "none",
+                         "observation": "felt-like-it"}], T13)
+        self.assertTrue(report.errors)
+
+    def test_observations_are_reported_separately_from_misfires(self):
+        by_case = {"T13": {"with_skill": [
+            {"case": "T13", "variant": "with_skill", "run": 1,
+             "verdict": "not_fire", "misfire_shape": "none",
+             "observation": "negative-routing"}]}}
+        cases = {"T13": {"expect": "not_fire"}}
+        self.assertEqual(eval_harness._misfire_section(cases, by_case)[-2:],
+                         ["No misfire recorded in this batch.", ""])
+        joined = "\n".join(eval_harness._observation_section(by_case))
+        self.assertIn("negative-routing", joined)
+        self.assertNotIn("misfire", joined.lower().replace("misfires", ""))
 
 
 class VerdictTypeTests(unittest.TestCase):

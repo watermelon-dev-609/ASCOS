@@ -45,8 +45,14 @@ ALL_GROUPS = BEHAVIOUR_GROUPS + ("trigger",)
 SKILLS = ("requirements", "architecture", "implementation",
           "debugging", "code-review", "verification")
 VARIANTS = ("with_skill", "without_skill")
-BEHAVIOUR_VERDICTS = ("pass", "fail")
-TRIGGER_VERDICTS = ("fire", "not_fire")
+# A run that could not measure what the case measures — e.g. an unrelated
+# connector in the harness hijacked the request before ASCOS could see it.
+# Excluded from every denominator: counting it as a miss would blame the
+# skill for the environment, and counting it as a hit would be a lie.
+INVALID = "invalid"
+
+BEHAVIOUR_VERDICTS = ("pass", "fail", INVALID)
+TRIGGER_VERDICTS = ("fire", "not_fire", INVALID)
 
 # Shape of a must-not-fire misfire. Recording *what kind* of overreach happened
 # matters more than the count: two different shapes point at two different
@@ -54,6 +60,12 @@ TRIGGER_VERDICTS = ("fire", "not_fire")
 # boundary. See evals/runs/2026-09-14-round3-triggers.md.
 MISFIRE_SHAPES = ("none", "risk-tail", "router-language", "PRD-overreach",
                   "DoD-overreach", "subskill-name-leak")
+
+# Non-misfire observation tags. A must-not-fire case can mention ASCOS while
+# correctly declining it; that is the routing decision being visible, not the
+# skill activating. Keeping it out of misfire_shape stops "explained why I
+# won't trigger" from scoring worse than saying nothing.
+OBSERVATIONS = ("negative-routing",)
 
 MIN_FIRE = 10  # the corpus must keep 10 must-fire / 10 must-not-fire or it
 MIN_NOT_FIRE = 10  # stops being able to detect either kind of trigger failure
@@ -166,21 +178,38 @@ def records_check(report: Report, cases: list[dict]) -> None:
             report.check(verdict in BEHAVIOUR_VERDICTS, "%s verdict matches its case type" % label,
                          "behaviour case expects pass/fail, got %r" % verdict)
 
-        shape = rec.get("misfire_shape")
-        if expect == "not_fire":
-            report.check(shape in MISFIRE_SHAPES,
-                         "%s records a misfire_shape" % label,
-                         "must-not-fire records need one of %s, got %r"
-                         % (MISFIRE_SHAPES, shape))
-            if shape in MISFIRE_SHAPES:
-                consistent = ((verdict == "not_fire" and shape == "none")
-                              or (verdict == "fire" and shape != "none"))
-                report.check(consistent, "%s shape agrees with its verdict" % label,
-                             "verdict=%r but shape=%r" % (verdict, shape))
-        elif shape is not None:
-            report.check(shape == "none",
-                         "%s has no shape to record" % label,
-                         "only must-not-fire cases carry a misfire_shape, got %r" % shape)
+        if verdict == INVALID:
+            # An unmeasurable run is only honest if it says why, otherwise
+            # "invalid" becomes a drawer to sweep inconvenient results into.
+            report.check(bool(rec.get("note")),
+                         "%s explains why it is invalid" % label,
+                         "an invalid run with no reason cannot be audited")
+            shape = rec.get("misfire_shape")
+            report.check(shape in (None, "none"),
+                         "%s carries no misfire_shape" % label,
+                         "nothing was observed, so no shape can be recorded, got %r"
+                         % shape)
+        else:
+            shape = rec.get("misfire_shape")
+            if expect == "not_fire":
+                report.check(shape in MISFIRE_SHAPES,
+                             "%s records a misfire_shape" % label,
+                             "must-not-fire records need one of %s, got %r"
+                             % (MISFIRE_SHAPES, shape))
+                if shape in MISFIRE_SHAPES:
+                    consistent = ((verdict == "not_fire" and shape == "none")
+                                  or (verdict == "fire" and shape != "none"))
+                    report.check(consistent, "%s shape agrees with its verdict" % label,
+                                 "verdict=%r but shape=%r" % (verdict, shape))
+            elif shape is not None:
+                report.check(shape == "none",
+                             "%s has no shape to record" % label,
+                             "only must-not-fire cases carry a misfire_shape, got %r" % shape)
+
+        obs = rec.get("observation")
+        if obs is not None:
+            report.check(obs in OBSERVATIONS, "%s uses a known observation tag" % label,
+                         "one of %s, got %r" % (OBSERVATIONS, obs))
 
 
 # --- records --------------------------------------------------------------
@@ -332,6 +361,11 @@ def cmd_ingest(args) -> int:
         elif rec.get("misfire_shape", "none") != "none":
             errors.append("#%d: only must-not-fire cases carry a misfire_shape, "
                           "got %r" % (i, rec.get("misfire_shape")))
+        if rec.get("verdict") == INVALID and not rec.get("note"):
+            errors.append("#%d: an invalid record must say why in `note`" % i)
+        if rec.get("observation") is not None and rec.get("observation") not in OBSERVATIONS:
+            errors.append("#%d: observation must be one of %s"
+                          % (i, OBSERVATIONS))
         key = (rec.get("case"), rec.get("variant"), rec.get("run"))
         if key in index and not args.replace:
             errors.append("#%d: %s run %s already recorded (use --replace)"
@@ -405,6 +439,30 @@ def _misfire_section(cases: dict[str, dict], by_case: dict) -> list[str]:
     return out
 
 
+def _observation_section(by_case: dict) -> list[str]:
+    """Non-misfire observation tags.
+
+    Reported beside the misfire table, never inside it: a negative-routing
+    statement is the routing decision being legible, which is the opposite of
+    a misfire.
+    """
+    tally: dict[str, list[str]] = {}
+    for cid in sorted(by_case):
+        for variant in VARIANTS:
+            for rec in by_case[cid].get(variant, []):
+                tag = rec.get("observation")
+                if tag:
+                    tally.setdefault(tag, []).append(cid)
+    if not tally:
+        return []
+    out = ["## Observations (recorded, not counted as misfires)", ""]
+    for tag, cids in sorted(tally.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+        out.append("- `%s` — %d record(s) across %s"
+                   % (tag, len(cids), ", ".join(sorted(set(cids)))))
+    out += [""]
+    return out
+
+
 def cmd_report(args) -> int:
     cases = {c["id"]: c for c in load_cases() if c.get("id")}
     records = load_records()
@@ -423,12 +481,13 @@ def cmd_report(args) -> int:
              % (rel(RECORDS_FILE), len(records)), ""]
 
     overall: dict[str, dict] = {}
+    invalids: list[tuple[str, str, object, str]] = []
     for cid in sorted(by_case):
         case = cases.get(cid, {})
         expect = case.get("expect", "pass")
         lines.append("## %s · %s · expect=%s" % (cid, case.get("group", "?"), expect))
         lines.append("")
-        cols = (["variant", "runs", "hits"]
+        cols = (["variant", "measured", "hits", "invalid"]
                 + ["pass@%d" % k for k in ks]
                 + ["mean s", "mean tokens"])
         lines.append("| " + " | ".join(cols) + " |")
@@ -437,23 +496,38 @@ def cmd_report(args) -> int:
             runs = by_case[cid].get(variant, [])
             if not runs:
                 continue
-            hits = sum(1 for r in runs if r.get("verdict") == expect)
-            n = len(runs)
-            row = [variant, str(n), "%d/%d" % (hits, n)]
+            # Invalid runs never reach the denominator: they measured the
+            # environment, not the skill.
+            measured = [r for r in runs if r.get("verdict") != INVALID]
+            dropped = len(runs) - len(measured)
+            hits = sum(1 for r in measured if r.get("verdict") == expect)
+            n = len(measured)
+            row = [variant, str(n), ("%d/%d" % (hits, n)) if n else "—", str(dropped)]
             row += [_fmt(pass_at_k(n, hits, k)) for k in ks]
-            row.append(_fmt(_mean([r["seconds"] for r in runs if "seconds" in r])))
-            row.append(_fmt(_mean([r["tokens"] for r in runs if "tokens" in r])))
+            row.append(_fmt(_mean([r["seconds"] for r in measured if "seconds" in r])))
+            row.append(_fmt(_mean([r["tokens"] for r in measured if "tokens" in r])))
             lines.append("| " + " | ".join(row) + " |")
-            agg = overall.setdefault(variant, {"n": 0, "hits": 0, "sec": [], "tok": []})
+            agg = overall.setdefault(variant, {"n": 0, "hits": 0, "sec": [], "tok": [],
+                                               "invalid": 0})
             agg["n"] += n
             agg["hits"] += hits
-            agg["sec"] += [r["seconds"] for r in runs if "seconds" in r]
-            agg["tok"] += [r["tokens"] for r in runs if "tokens" in r]
+            agg["invalid"] += dropped
+            agg["sec"] += [r["seconds"] for r in measured if "seconds" in r]
+            agg["tok"] += [r["tokens"] for r in measured if "tokens" in r]
+            for rec in [r for r in runs if r.get("verdict") == INVALID]:
+                invalids.append((cid, variant, rec.get("run"), rec.get("note", "")))
         lines.append("")
 
     misfire = _misfire_section(cases, by_case)
     if misfire:
         lines += misfire
+    lines += _observation_section(by_case)
+    if invalids:
+        lines += ["## Not measurable (excluded from every rate)", "",
+                  "| case | variant | run | reason |", "|---|:--:|:--:|---|"]
+        for cid, variant, run, note in invalids:
+            lines.append("| %s | %s | %s | %s |" % (cid, variant, run, note))
+        lines += [""]
 
     lines.append("## Totals")
     lines.append("")

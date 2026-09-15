@@ -1,0 +1,21 @@
+{"case": "T05", "variant": "with_skill", "run": 1, "verdict": "invalid", "note": "run1 (round 4): hijacked by the host's weixinpay connector — the answer opened the 开通/绑定 flow before ASCOS could ever be evaluated"}
+{"case": "T01", "variant": "with_skill", "run": 2, "verdict": "not_fire", "observation": "negative-routing", "note": "run2: declined by name ('不启动 ai-software-company-skill 编排器'), citing Not for 纯文案润色; a generic risk table is present but there is no sizing and no routing chain"}
+{"case": "T02", "variant": "with_skill", "run": 2, "verdict": "fire", "note": "run2: routed to requirements, emitted the contract's failure state (阻断性待确认清单)"}
+{"case": "T03", "variant": "with_skill", "run": 2, "verdict": "fire", "note": "run2: named chain debugging → code-review → verification, sized 中 (支付链路强制安全审查)"}
+{"case": "T04", "variant": "with_skill", "run": 2, "verdict": "fire", "note": "run2: ASCOS intake, sized 大, chain requirements → architecture → implementation → verification"}
+{"case": "T05", "variant": "with_skill", "run": 2, "verdict": "invalid", "note": "run2: host weixinpay connector in scope; routing was decided by '专用技能优先于通用编排器' over weixinpay-register — a host-specific reason, not an ASCOS judgement"}
+{"case": "T06", "variant": "with_skill", "run": 2, "verdict": "fire", "note": "run2: named the ASCOS orchestrator, sized 大, held at architecture fork questions"}
+{"case": "T07", "variant": "with_skill", "run": 2, "verdict": "fire", "note": "run2: ASCOS delivery summary, sized 中, chain requirements → implementation → code-review → verification"}
+{"case": "T08", "variant": "with_skill", "run": 2, "verdict": "fire", "note": "run2: loaded SKILL.md, emitted '路由结果（按 ASCOS 总控判定）' with chain code-review → verification, the two-axis Standards/Spec review contract, DoD and 剩余风险清单"}
+{"case": "T09", "variant": "with_skill", "run": 2, "verdict": "fire", "note": "run2: chain debugging → code-review → verification, evidence-first stop at debugging intake"}
+{"case": "T10", "variant": "with_skill", "run": 2, "verdict": "fire", "note": "run2: ASCOS orchestrator delivery note with sizing, chain and 剩余风险清单"}
+{"case": "T01", "variant": "with_skill", "run": 3, "verdict": "not_fire", "observation": "negative-routing", "note": "run3: declined ('未加载 ai-software-company-skill'), judged a string-level replacement with zero architecture impact"}
+{"case": "T02", "variant": "with_skill", "run": 3, "verdict": "fire", "note": "run3: 'ASCOS 交付记录' with an explicit 触发判定 and 大 sizing"}
+{"case": "T03", "variant": "with_skill", "run": 3, "verdict": "fire", "note": "run3: named the orchestrator as the routing source, chain debugging → code-review → verification"}
+{"case": "T04", "variant": "with_skill", "run": 3, "verdict": "fire", "note": "run3: named ASCOS, sized 大, held at requirements with fork questions"}
+{"case": "T05", "variant": "with_skill", "run": 3, "verdict": "fire", "note": "run3: ASCOS fired — 受理单 with 分级 ('支付' → 至少中), routing chain, ADR/变更影响清单/剩余风险清单. The host connector injected a spurious '开通 AI 专属卡' branch but it did not change the routing outcome, so the run stayed measurable"}
+{"case": "T06", "variant": "with_skill", "run": 3, "verdict": "fire", "note": "run3: named ASCOS routing architecture → implementation → verification, held on missing repo context"}
+{"case": "T07", "variant": "with_skill", "run": 3, "verdict": "fire", "note": "run3: orchestrator routing chain + 中 sizing + 事实/假设 boundary"}
+{"case": "T08", "variant": "with_skill", "run": 3, "verdict": "fire", "note": "run3: '按总控路由表归类' → chain code-review → verification; contract failure state on missing diff/base quoting SKILL.md"}
+{"case": "T09", "variant": "with_skill", "run": 3, "verdict": "fire", "note": "run3: named the triggered skill, routing decision + evidence checklist + ranked hypotheses"}
+{"case": "T10", "variant": "with_skill", "run": 3, "verdict": "fire", "note": "run3: stated it executed under ai-software-company-skill, with sizing, routing and 剩余风险清单"}
