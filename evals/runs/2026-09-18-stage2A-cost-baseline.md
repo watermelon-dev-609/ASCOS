@@ -164,6 +164,30 @@ B 臂额外在 `~/.codex/skills/` 下放 ASCOS 技能包（即 `ai-software-comp
 
 结论没变：Codex 通路仍不可用，且即使修好中继，第 8 条也会先让批量跑挂住。
 
+### 8.2 `claude -p` 通路复测：可用（runner 真实路径已打通）
+
+用 `cost_runner.resolve_bin` + `build_command` + `summarise_claude` 完整走了一遍，
+不是单独调 CLI：
+
+```
+resolved bin: C:\Users\EDY\AppData\Roaming\npm\claude.CMD   # npm 的 .cmd 垫片
+returncode 0 | input=29672 output=2 total=29674 seconds=1.07 tool_calls=0
+```
+
+即：解析到 `.cmd`（Python subprocess 直接调 `claude` 会 `FileNotFoundError`）、
+退出码 0、token 与时间都取得到。四件事里第一件已用真实调用确认。
+
+**新发现的一个口径问题（必须写进 §6）：Claude Code 的系统提示底噪是 ~29.7k input token。**
+一句 `reply with the single word: ok` 也要 29672 input。含义有三条：
+
+1. **绝对 input 被常数主导**。E01 两臂 38228 / 32213 里，约 3 万是固定底噪，
+   真正的任务量只有几 k。所以 **input 的 Δ% 会被机械压缩**，不能拿它当主要信号。
+2. **主要信号在 output 与工具调用**（E01：7101 vs 2951，19 vs 10），
+   那里底噪不参与，ASCOS 的行为差异才显形。
+3. **A 臂不是"裸模型"**，是"装了 ASCOS 的 Claude Code vs 没装 ASCOS 的 Claude Code"。
+   这恰好是用户真正要问的问题（**ASCOS 加在编码智能体上到底贵多少**），
+   但它**不是**"ASCOS vs 空"，报告里必须这么写，不能写成后者。
+
 ---
 
 ## 9. 附：运行器自检（**不是协议数据，已删除**）
