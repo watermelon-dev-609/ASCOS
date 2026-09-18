@@ -719,19 +719,30 @@ class CostRunnerBatchTests(unittest.TestCase):
                              "acceptEdits")
             self.assertIn("WebSearch", cmd[cmd.index("--disallowedTools") + 1])
 
-    def test_the_shell_is_opened_only_far_enough_to_verify(self):
-        """A fully closed shell means verification cost is paid and the benefit
-        never arrives. Naming the wrong shell tool is silently ignored, so the
-        spec has to follow the platform."""
+    def test_the_shell_is_opened_on_the_platform_s_tool(self):
+        """A closed shell means verification cost is paid and the benefit never
+        arrives. Naming the wrong shell tool is silently ignored rather than
+        rejected, so the spec has to follow the platform."""
         self._run_batch(self._args(case="E01", arm=["with_skill"]))
+        self.assertTrue(self.seen)
         for cmd in self.seen:
             specs = [cmd[i + 1] for i, a in enumerate(cmd)
                      if a == "--allowedTools"]
             for prefix in cost_runner.SHELL_PREFIXES:
-                self.assertIn("%s(%s:*)" % (cost_runner.SHELL_TOOL, prefix),
-                              specs)
-            # Nothing beyond running and testing code is granted.
-            self.assertNotIn(cost_runner.SHELL_TOOL, specs)
+                if prefix == "*":
+                    # The whole tool; `Tool(*,*)` would be a command prefix.
+                    self.assertIn("%s(*)" % cost_runner.SHELL_TOOL, specs)
+                else:
+                    self.assertIn("%s(%s:*)" % (cost_runner.SHELL_TOOL, prefix),
+                                  specs)
+            self.assertFalse([s for s in specs
+                              if s.startswith("Bash") and cost_runner.SHELL_TOOL != "Bash"])
+
+    def test_a_narrow_shell_allowlist_is_what_made_denials_asymmetric(self):
+        """Regression guard on the r4 finding: node/npm-only cost the with_skill
+        arm 48 denials against the control's 2. The constant is the whole shell;
+        if it ever narrows again the batch is biased against ASCOS."""
+        self.assertEqual(cost_runner.SHELL_PREFIXES, ("*",))
 
     def test_an_unknown_fixture_is_rejected_loudly(self):
         """E10 needed its own fixture; a typo in that name would otherwise hand
@@ -772,6 +783,55 @@ class CostRunnerBatchTests(unittest.TestCase):
         recs = self._records()
         self.assertTrue(recs)
         self.assertEqual(eval_harness.cost_errors(recs[0]), [])
+
+
+class FailureClassificationTests(unittest.TestCase):
+    """`is_error` covers two different events and counting them together
+    misreports both. See protocol §15.1."""
+
+    def test_a_refused_command_is_not_a_failed_command(self):
+        import inspect_cost_batch
+        self.assertEqual(
+            inspect_cost_batch.classify_failure(
+                {"content": "Claude requested permissions to write to "
+                            "/tmp/x.cjs, but you haven't granted it yet."}),
+            "denied")
+        self.assertEqual(
+            inspect_cost_batch.classify_failure(
+                {"content": "uses a complex path expression that cannot be "
+                            "statically validated and requires manual approval"}),
+            "denied")
+
+    def test_a_command_that_ran_and_exited_nonzero_is_a_failure(self):
+        """Exit 1 is ordinary, and sometimes the point of a verification step.
+        Counting it as friction inflates the apparent bias."""
+        import inspect_cost_batch
+        self.assertEqual(inspect_cost_batch.classify_failure(
+            {"content": "Exit code 1"}), "failed")
+
+    def test_the_census_separates_arms_so_asymmetry_is_visible(self):
+        """A blended total hid the r4 bias; per-arm columns expose it. This
+        builds a two-arm batch on disk and checks the split is real."""
+        import inspect_cost_batch
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root)
+        events = os.path.join(root, "events")
+        os.makedirs(events)
+        for label, marks in (("E01-with_skill-1",
+                              ["you haven't granted it yet.", "Exit code 1"]),
+                             ("E01-without_skill-1", ["Exit code 1"])):
+            with open(os.path.join(events, label + ".jsonl"), "w",
+                      encoding="utf-8", newline="\n") as fh:
+                for mark in marks:
+                    fh.write(json.dumps({"message": {"content": [
+                        {"type": "tool_result", "is_error": True,
+                         "content": mark}]}}) + "\n")
+        census = inspect_cost_batch.failure_census(
+            root, ["E01-with_skill-1", "E01-without_skill-1"])
+        self.assertEqual(census["with"], {"denied": 1, "failed": 1})
+        self.assertEqual(census["without"], {"denied": 0, "failed": 1})
+        self.assertNotEqual(census["with"]["denied"],
+                            census["without"]["denied"])
 
 
 if __name__ == "__main__":

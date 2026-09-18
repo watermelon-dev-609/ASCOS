@@ -44,10 +44,15 @@ CLI_SKILL_SUBDIR = {"claude": os.path.join(".claude", "skills"),
 # The shell tool is named differently per platform, and a spec against the
 # wrong name is silently ignored rather than rejected.
 SHELL_TOOL = "PowerShell" if os.name == "nt" else "Bash"
-# Only what a run needs in order to verify its own work. Deliberately not the
-# whole shell: the point is to let ASCOS demonstrate its benefit, not to hand
-# out arbitrary command execution.
-SHELL_PREFIXES = ("node", "npm")
+# The whole shell, and why it has to be: a narrow allowlist (node/npm only)
+# denied 48 commands on the with_skill arm against 2 on the control — 24x
+# asymmetric, every one of them landing on the arm under test. ASCOS's
+# verification discipline is exactly what reaches for git, directory listings
+# and throw-away check scripts, so a narrow allowlist taxes the behaviour this
+# stage is trying to measure. The cost is not symmetric, so it is not noise.
+# The workspace is a disposable copy of a fixture, which is what makes this
+# acceptable at all.
+SHELL_PREFIXES = ("*",)
 
 
 def parse_events(text: str) -> list[dict]:
@@ -261,16 +266,18 @@ def build_command(cli: str, prompt: str, model: str | None, bin_path: str) -> li
         cmd = [bin_path, "-p", prompt, "--output-format", "stream-json",
                "--verbose", "--disallowedTools", "WebSearch",
                "--permission-mode", "acceptEdits"]
-        # On top of that, the shell is opened just far enough to run and test
-        # code and no further: ASCOS's verification step writes a script and
-        # executes it, and with the shell fully closed that cost is paid while
-        # the benefit never arrives, which biases the whole batch against it.
+        # On top of that, the shell is opened: ASCOS's verification step runs
+        # commands and writes scripts, and with the shell closed that cost is
+        # paid while the benefit never arrives.
         #
         # The tool is PowerShell on Windows and Bash elsewhere — verified, not
         # assumed: every Bash(...) spec was silently a no-op here, which is why
         # command execution looked completely blocked.
         for prefix in SHELL_PREFIXES:
-            cmd += ["--allowedTools", "%s(%s:*)" % (SHELL_TOOL, prefix)]
+            # "*" means the whole tool, and the pattern for that is `Tool(*)`,
+            # not `Tool(*:*)` — the `:*` form is a command prefix.
+            spec = "%s(*)" % SHELL_TOOL if prefix == "*" else "%s(%s:*)" % (SHELL_TOOL, prefix)
+            cmd += ["--allowedTools", spec]
         if model:
             cmd += ["--model", model]
         return cmd

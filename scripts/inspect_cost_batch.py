@@ -70,6 +70,38 @@ def changed_files(ws, fixture):
     return sorted(changed), sorted(added)
 
 
+DENIAL_MARKS = ("haven't granted", "denied", "statically validated",
+                "requires manual approval", "permission")
+
+
+def classify_failure(result: dict) -> str:
+    """Split `is_error` results into refused and merely-failed.
+
+    Conflating the two is what made the r5 fix look like it had failed: a
+    command that ran and exited 1 is ordinary (sometimes it is the whole point
+    of a verification step), while a command that never ran because permission
+    was refused is harness friction. Friction is the thing that biased pilot r4
+    14-to-2 against the arm under test, so it gets its own column.
+    """
+    low = json.dumps(result, ensure_ascii=False).lower()
+    return "denied" if any(m in low for m in DENIAL_MARKS) else "failed"
+
+
+def failure_census(D: str, labels: list[str]) -> dict:
+    """Refused vs failed, per arm. Asymmetry here is a validity problem."""
+    census = {}
+    for label in labels:
+        arm = "with" if "-with_skill" in label else "without"
+        ev = cost_runner.parse_events(
+            open(os.path.join(D, "events", label + ".jsonl"),
+                 encoding="utf-8").read())
+        bucket = census.setdefault(arm, {"denied": 0, "failed": 0})
+        for r in results(ev):
+            if r.get("is_error"):
+                bucket[classify_failure(r)] += 1
+    return census
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--dir", default=os.path.join(
@@ -108,6 +140,20 @@ def main() -> int:
                 print("    DENIED %s | %s" % (e.get("tool_name"),
                                               str(e.get("message"))[:110]))
         print()
+
+    census = failure_census(D, labels)
+    print("=== 失败与拒绝（按臂）")
+    print("    %-10s %8s %8s" % ("arm", "denied", "failed"))
+    for arm in ("with", "without"):
+        b = census.get(arm, {"denied": 0, "failed": 0})
+        print("    %-10s %8d %8d" % (arm, b["denied"], b["failed"]))
+    denied = {a: census.get(a, {}).get("denied", 0) for a in ("with", "without")}
+    if denied["with"] != denied["without"]:
+        print("    !! 拒绝不对称：偏倚会压在拒绝更多的那一臂上，"
+              "该批次的成本与 verified 判分都不可直接采信")
+    else:
+        print("    拒绝对称（含同为 0）。")
+    print()
 
     return 0
 

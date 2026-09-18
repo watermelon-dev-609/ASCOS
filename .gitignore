@@ -2,4 +2,8 @@
 .workbuddy-ai/
 eval-fixtures/**/logs/payments.log
 eval-scratch/
+# Per-run workspace copies: a fixture clone per run, megabytes each and
+# reproducible from the fixture. The events and records above them are the
+# evidence and must stay tracked.
+evals/cost/results/raw/*/ws/
 
