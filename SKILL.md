@@ -60,6 +60,21 @@ root 只描述**决策条件**，不描述**执行方法**：
 | 多模块 / 跨层 / 新架构 / 权限体系 / AI 功能 | 大 | 完整链路 + 文档 |
 | 含任一：鉴权 / 支付 / 数据迁移 / 对外接口 | 至少中 | 强制安全审查；上线则强制发布检查 |
 
+### 推理预算 L0 / L1 / L2（Minimum Sufficient Reasoning）
+
+级别按上表判定，同时决定**加载什么**和**产出多长**。超预算即为过度设计。
+
+| 级别 | 必加载 | 不加载 | 产出上限 |
+|---|---|---|---|
+| **L0 小** | `implementation` + `verification` + `repository-awareness.md` | `change-impact.md`、`context-model.md`、`non-negotiables.md`（其三条已并入本节） | **三段封顶**：改动点 / 一条真实证据（命令 + 真实输出）/ 未验证项。风险 ≤3 条，禁止表格化清单与过程推演外露 |
+| **L1 中** | 路由链 + 按需 reference | — | 补全 + 实现 + 测试 + 风险 |
+| **L2 大** | 完整链路 + 文档 | — | 完整 |
+
+L0 依然必须：① 先感知代码库再改（复用既有约定）；② 给出真实验证证据，跑不了就写明未验证项；③ 必附风险清单，只是 ≤3 条。
+**降级的理由只能是"多出来的过程对这个任务没有对应风险"，不能是"省一点 token"。**
+`verification` 在任何级别都不省：它是 L0 唯一被要求留下的过程开销，因为**小任务也会写出用户看不见的缺陷**
+（实测：改主色导致文字对比度跌破 WCAG AA，只有走了验证的那条链路才发现）。
+
 ## Skill Routing Table（核心）
 | 用户意图 / 信号 | 调用链 |
 |---|---|
@@ -89,9 +104,9 @@ root 只描述**决策条件**，不描述**执行方法**：
 ## 知识文档按需加载（只加载相关的）
 | 触发条件 | 加载 |
 |---|---|
-| 任何任务（交付前） | `non-negotiables.md` |
-| 已有项目 | `repository-awareness.md` + `change-impact.md` |
-| 已有项目（术语对齐） | `context-model.md` |
+| L1 / L2（交付前） | `non-negotiables.md` — L0 不加载，其三条已并入「推理预算」表 |
+| 已有项目 | `repository-awareness.md`（L0 亦加载）+ `change-impact.md`（L0 不加载） |
+| 已有项目（术语对齐） | `context-model.md`（L0 不加载） |
 | 角色选择 | `roles.md` |
 | 前端 / 后端 / 存储实现 | `frontend.md` / `backend.md` / `database.md` |
 | 登录 / 权限 / 外部输入 / 敏感数据 | `security.md` |
