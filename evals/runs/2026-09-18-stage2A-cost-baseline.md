@@ -125,4 +125,24 @@ B 臂额外在 `~/.codex/skills/` 下放 ASCOS 技能包（即 `ai-software-comp
 
 ## 8. 结果
 
-（执行后追加）
+**试点未执行：Codex 通路在本机不可用。** 协议其余部分仍然有效，待通路恢复后照原样执行。
+
+`codex login` 之后仍失败，逐层定位（每一步都留了证据）：
+
+| # | 现象 | 含义 |
+|---|---|---|
+| 1 | `wss://api.openai.com/v1/responses` → **401** | 认证有问题时，公网其实可直达 |
+| 2 | 登录后 `wss://chatgpt.com/backend-api/codex/responses` → **os error 10061** | 换成 ChatGPT OAuth 后走的端点不通 |
+| 3 | `chatgpt.com` 解析到 **159.65.107.38**，`curl --noproxy '*'` 返回 **000** | 该端点从此网络不可达 |
+| 4 | 改走本地中继 `model_provider="cc-switch-official"` → **502 `上游连接失败`** | 中继收到请求，但自己转发不出去 |
+| 5 | `curl http://127.0.0.1:15721/v1/models` → **`{"models":[]}`** | **中继在跑，但上游供应商是空的** |
+
+**根因是第 5 条**：CC Switch 本地中继没有可用 provider。这既不是认证问题
+（`codex login` 解决不了），也不是我这边能改的东西——它属于用户侧配置。
+
+**不做的事**：不伪造一次"成功"的试点，不用字符数折算 token 充数，
+不在通路不通的情况下开跑 72 次。测不到就留空，是本批第 2 节写死的规矩。
+
+**待用户二选一**：修好 CC Switch 的上游 provider 后我按本协议跑；
+或改用 `claude -p`（已实测可通，精确 token + 可观测文件读取），
+协议除 CLI/模型外不变。
