@@ -8,8 +8,12 @@ and must not need it. Run with `python scripts/test_eval_tools.py`.
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 import unittest
+import unittest.mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -459,6 +463,122 @@ class CostRunnerTests(unittest.TestCase):
         ])
         self.assertEqual(skills, ["implementation"])
         self.assertEqual(refs, [])
+
+
+class CostRunnerIOTests(unittest.TestCase):
+    """Workspace preparation and record construction.
+
+    These exercise the parts that decide whether the two arms can differ at
+    all, which is the one thing that makes the comparison meaningful.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.sample = read_text(cost_runner.SAMPLE
+                                if hasattr(cost_runner, "SAMPLE") else
+                                os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                             "testdata", "claude-sample.jsonl"))
+
+    def workspace(self, name):
+        return os.path.join(self.tmp, name)
+
+    def test_with_skill_arm_installs_the_skill(self):
+        dest = self.workspace("with")
+        cost_runner.prepare_workspace(dest, "cost-app", "with_skill", "claude")
+        self.assertTrue(os.path.isfile(
+            os.path.join(dest, ".claude", "skills", "ascos", "SKILL.md")))
+
+    def test_without_skill_arm_installs_nothing(self):
+        dest = self.workspace("without")
+        cost_runner.prepare_workspace(dest, "cost-app", "without_skill", "claude")
+        self.assertFalse(os.path.isdir(os.path.join(dest, ".claude")))
+        self.assertTrue(os.path.isfile(os.path.join(dest, "package.json")))
+
+    def test_empty_workspace_still_gets_the_skill(self):
+        """E13 builds from nothing — but must still differ between arms.
+
+        An early return here once produced two identical arms for E13: a pair
+        of runs that cannot differ measures nothing.
+        """
+        dest = self.workspace("empty")
+        cost_runner.prepare_workspace(dest, "empty", "with_skill", "claude")
+        self.assertTrue(os.path.isfile(
+            os.path.join(dest, ".claude", "skills", "ascos", "SKILL.md")))
+        self.assertFalse(os.path.exists(os.path.join(dest, "package.json")))
+
+    def test_workspace_is_rebuilt_so_a_second_run_gets_a_clean_fixture(self):
+        dest = self.workspace("twice")
+        cost_runner.prepare_workspace(dest, "cost-app", "without_skill", "claude")
+        with open(os.path.join(dest, "dirty.txt"), "w") as fh:
+            fh.write("left over")
+        cost_runner.prepare_workspace(dest, "cost-app", "without_skill", "claude")
+        self.assertFalse(os.path.exists(os.path.join(dest, "dirty.txt")))
+
+    def _run(self, stdout="", returncode=0, stderr=""):
+        case = {"id": "E01", "prompt": "do the thing"}
+        fake = lambda *a, **k: subprocess.CompletedProcess(  # noqa: E731
+            a, returncode, stdout, stderr)
+        original = cost_runner.subprocess.run
+        cost_runner.subprocess.run = fake
+        try:
+            return cost_runner.run_one(case, "with_skill", 1, "claude", None,
+                                       "empty", self.tmp, bin_path="x")
+        finally:
+            cost_runner.subprocess.run = original
+
+    def test_record_carries_what_the_stream_reported(self):
+        rec = self._run(stdout=self.sample)
+        self.assertEqual(rec["case"], "E01")
+        self.assertEqual(rec["variant"], "with_skill")
+        self.assertEqual(rec["run"], 1)
+        self.assertEqual(rec["verdict"], "pass")
+        self.assertEqual(rec["input_tokens"], 29952)
+        self.assertEqual(rec["tool_calls"], 1)
+
+    def test_a_failed_run_is_invalid_and_must_say_why(self):
+        """`invalid` without a reason is a drawer to sweep results into."""
+        rec = self._run(returncode=1, stderr="boom")
+        self.assertEqual(rec["verdict"], "invalid")
+        self.assertIn("boom", rec["note"])
+
+    def test_a_timeout_is_invalid_without_taking_the_batch_down(self):
+        """72 runs is long enough that one hang must not cost the other 71."""
+        def hang(*a, **k):
+            raise subprocess.TimeoutExpired(cmd="x", timeout=900,
+                                            output="half a turn")
+        case = {"id": "E01", "prompt": "p"}
+        with unittest.mock.patch.object(cost_runner.subprocess, "run", hang):
+            rec = cost_runner.run_one(case, "with_skill", 1, "claude", None,
+                                      "empty", self.tmp, bin_path="x")
+        self.assertEqual(rec["verdict"], "invalid")
+        self.assertIn("timeout", rec["note"])
+        self.assertIn("half a turn", rec["note"])
+        self.assertIsNone(rec["total_tokens"])
+
+    def test_an_unmeasurable_run_stays_empty_rather_than_zero(self):
+        rec = self._run(stdout='{"type":"turn.started"}')
+        self.assertIsNone(rec["input_tokens"])
+        self.assertIsNone(rec["total_tokens"])
+
+    def test_raw_events_are_kept_so_a_verdict_can_be_reaudited(self):
+        self._run(stdout=self.sample)
+        self.assertTrue(os.path.isfile(
+            os.path.join(self.tmp, "events", "E01-with_skill-1.jsonl")))
+
+    def test_bin_override_is_used_verbatim(self):
+        self.assertEqual(cost_runner.resolve_bin("claude", "C:/x/claude.cmd"),
+                         "C:/x/claude.cmd")
+
+    def test_manifest_joins_the_corpus_into_a_runnable_batch(self):
+        manifest = os.path.join(eval_common.ROOT, "evals", "cost", "manifest.json")
+        batch = cost_runner.load_batch(manifest, eval_harness.load_cases())
+        self.assertEqual(len(batch), 12)
+        by_id = {c["id"]: c for c in batch}
+        self.assertEqual(by_id["E01"]["bucket"], "small")
+        self.assertEqual(by_id["E13"]["bucket"], "large")
+        self.assertEqual(by_id["E13"]["workspace"], "empty")
+        self.assertTrue(all(c["prompt"] for c in batch))
 
 
 if __name__ == "__main__":

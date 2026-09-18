@@ -165,9 +165,12 @@ def prepare_workspace(dest: str, workspace: str, arm: str, cli: str) -> None:
     if os.path.isdir(dest):
         shutil.rmtree(dest)
     os.makedirs(dest)
-    if workspace == "empty":
-        return
-    shutil.copytree(os.path.join(FIXTURE), dest, dirs_exist_ok=True)
+    # E13 builds from nothing, so it gets no fixture — but it must still get
+    # the skill on the `with_skill` arm. Returning early here once made both
+    # arms identical for that case, which is a pair of runs that cannot
+    # differ and therefore cannot measure anything.
+    if workspace != "empty":
+        shutil.copytree(os.path.join(FIXTURE), dest, dirs_exist_ok=True)
     if arm == "with_skill":
         # Copy the skill package, not the repository. The default output
         # directory lives inside ROOT, so copying ROOT there would copy the
@@ -213,6 +216,14 @@ def build_command(cli: str, prompt: str, model: str | None, bin_path: str) -> li
     return cmd
 
 
+def _tail(text: str | None, limit: int = 200) -> str:
+    """Last `limit` chars of captured output — a note must stay short but still
+    show what the run was doing when it died."""
+    if not text:
+        return ""
+    return text.strip()[-limit:]
+
+
 def run_one(case: dict, arm: str, run: int, cli: str, model: str | None,
             workspace: str, out_dir: str, timeout: int = 900,
             bin_path: str | None = None) -> dict:
@@ -222,8 +233,19 @@ def run_one(case: dict, arm: str, run: int, cli: str, model: str | None,
     prepare_workspace(dest, workspace, arm, cli)
 
     cmd = build_command(cli, case["prompt"], model, resolve_bin(cli, bin_path))
-    proc = subprocess.run(cmd, cwd=dest, capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", timeout=timeout)
+    try:
+        proc = subprocess.run(cmd, cwd=dest, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        # One hung run must not take the batch down with it: 72 runs is long
+        # enough that a single timeout would otherwise cost everything before
+        # it. It is an unmeasured run, not a failed one, so it stays empty.
+        return {"case": case["id"], "variant": arm, "run": run,
+                "verdict": "invalid", "input_tokens": None,
+                "output_tokens": None, "total_tokens": None, "seconds": None,
+                "tool_calls": None, "skills_loaded": [],
+                "references_loaded": [],
+                "note": "timeout after %ds: %s" % (timeout, _tail(exc.stdout))}
     events = parse_events(proc.stdout)
 
     raw_dir = os.path.join(out_dir, "events")
@@ -250,10 +272,15 @@ def run_one(case: dict, arm: str, run: int, cli: str, model: str | None,
     }
     if proc.returncode != 0:
         # An invalid run has to say why, or "invalid" becomes a drawer to
-        # sweep inconvenient results into.
-        record["note"] = (summary.get("note")
-                          or "exit %d: %s" % (proc.returncode,
-                                              (proc.stderr or "").strip()[:200]))
+        # sweep inconvenient results into. Lead with the CLI's own failure:
+        # "no result event" is only a consequence, the cause is in stderr, and
+        # an audit months later needs to tell auth from rate limit from crash.
+        detail = (proc.stderr or "").strip()[:200]
+        record["note"] = "exit %d" % proc.returncode
+        if detail:
+            record["note"] += ": " + detail
+        if summary.get("note"):
+            record["note"] += " | " + summary["note"]
     elif summary.get("note"):
         record["note"] = summary["note"]
     return record
