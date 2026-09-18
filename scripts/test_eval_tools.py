@@ -20,6 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import eval_common  # noqa: E402
 from eval_common import read_text  # noqa: E402
+import cost_report  # noqa: E402
+import cost_resolution  # noqa: E402
 import cost_runner  # noqa: E402
 import eval_harness  # noqa: E402
 
@@ -794,6 +796,10 @@ class CostRunnerBatchTests(unittest.TestCase):
             self.assertIn("files_read", rec)
             self.assertTrue(all("/" not in f and "\\" not in f
                                 for f in rec["files_read"]))
+            # Not vacuous: every `all()` above passes on an empty list, so
+            # without this the test would still be green if the field were
+            # never populated. The sample stream reads theme.js.
+            self.assertEqual(rec["files_read"], ["theme.js"])
 
 
 class RunFailureNoteTests(unittest.TestCase):
@@ -877,6 +883,119 @@ class FailureClassificationTests(unittest.TestCase):
         self.assertEqual(census["without"], {"denied": 0, "failed": 1})
         self.assertNotEqual(census["with"]["denied"],
                             census["without"]["denied"])
+
+
+class CostResolutionTests(unittest.TestCase):
+    """Power and specificity are different questions, and a batch can nail one
+    while failing the other.
+
+    The first version of cost_resolution.py answered only the specificity
+    question ("would noise alone look like success?") and printed the answer
+    under the heading "resolvable", next to a power calculation that said the
+    opposite. These tests pin the two apart using the regime the real batch is
+    actually in: effect smaller than the noise band, band still clear of the
+    threshold.
+    """
+
+    def _rows(self, spec):
+        """spec: {case: (with_values, without_values)} -> cost records."""
+        rows = []
+        for case, (w, o) in spec.items():
+            for arm, values in (("with_skill", w), ("without_skill", o)):
+                for v in values:
+                    rows.append({"case": case, "variant": arm, "verdict": "ok",
+                                 "total_tokens": v, "input_tokens": v,
+                                 "output_tokens": v, "tool_calls": 1,
+                                 "skills_loaded": [], "files_read": []})
+        return rows
+
+    def _analyse(self, spec, **kw):
+        return cost_resolution.analyse(self._rows(spec), **kw)
+
+    def test_a_batch_with_no_complete_case_cannot_be_analysed(self):
+        """One arm alone has no delta. Reporting a number here would be invented
+        precision, so it reports why instead."""
+        a = self._analyse({"E01": ([100, 110], [])})
+        self.assertFalse(a["ok"])
+        self.assertIn("both arms", a["reason"])
+
+    def test_an_underpowered_batch_fails_both_questions_not_just_one(self):
+        """The trap the first version fell into: it checked only whether noise
+        alone could mimic success, found that unlikely, and printed 'resolvable'
+        next to a power number saying the opposite. An under-powered batch is
+        usually bad at both, and the response to each is different."""
+        a = self._analyse({c: ([11000, 14000, 17000], [3000, 4000, 5000])
+                           for c in ("E01", "E02")},
+                          effect=0.15)
+        self.assertFalse(a["resolvable"])
+        self.assertLess(a["power"], 0.5)
+        self.assertGreater(a["false_positive_rate"], 0.05)
+        self.assertEqual(a["resolvable"], a["effect_tokens"] >= a["mde"])
+
+    def test_the_difference_of_two_batches_is_noisier_than_either_one(self):
+        """Comparing against a baseline that was itself measured doubles the
+        variance. Treating the old number as exact is what produced the
+        optimistic '176 runs' figure before it was corrected to 328."""
+        a = self._analyse({c: ([11000, 14000, 17000], [3000, 4000, 5000])
+                           for c in ("E01", "E02")})
+        self.assertAlmostEqual(a["se_diff"], a["se_point"] * 2 ** 0.5, places=6)
+        self.assertGreater(a["se_diff"], a["se_point"])
+
+    def test_a_large_effect_is_resolvable_at_the_same_sample_size(self):
+        """Same noise, bigger effect: power rises, nothing else has to change."""
+        tiny = self._analyse({c: ([11000, 14000, 17000], [3000, 4000, 5000])
+                              for c in ("E01", "E02")}, effect=0.15)
+        huge = self._analyse({c: ([11000, 14000, 17000], [3000, 4000, 5000])
+                              for c in ("E01", "E02")}, effect=0.95)
+        self.assertFalse(tiny["resolvable"])
+        self.assertTrue(huge["resolvable"])
+        self.assertGreater(huge["power"], tiny["power"])
+
+    def test_more_runs_shrink_the_required_effect_as_one_over_sqrt_n(self):
+        """Quadruple the runs, halve the minimum detectable effect."""
+        base = {"E01": ([11000, 14000, 17000], [3000, 4000, 5000]),
+                "E02": ([11000, 14000, 17000], [3000, 4000, 5000])}
+        wide = {"E01": ([11000] * 12 + [14000] * 12 + [17000] * 12,
+                        [3000] * 12 + [4000] * 12 + [5000] * 12),
+                "E02": ([11000] * 12 + [14000] * 12 + [17000] * 12,
+                        [3000] * 12 + [4000] * 12 + [5000] * 12)}
+        a = self._analyse(base)
+        b = self._analyse(wide)
+        self.assertLess(b["mde"], a["mde"] * 0.75)
+
+    def test_required_runs_scales_with_the_square_of_the_shortfall(self):
+        # An effect sitting exactly on the minimum detectable needs no more
+        # runs than the batch already has.
+        self.assertEqual(
+            cost_resolution.required_runs_from_se(
+                1000, cost_resolution.POWER_Z * 1000, 3), 3)
+        # Halving the effect costs 4x the runs: SE goes as 1/sqrt(n).
+        # (Smaller effect -> larger n, so the ratio is read this way round.)
+        big_effect = cost_resolution.required_runs_from_se(
+            1000, cost_resolution.POWER_Z * 1000, 3)
+        small_effect = cost_resolution.required_runs_from_se(
+            1000, cost_resolution.POWER_Z * 500, 3)
+        self.assertAlmostEqual(small_effect / big_effect, 4.0, delta=0.1)
+
+    def test_the_real_batch_cannot_adjudicate_its_own_15_percent_criterion(self):
+        """The finding that changed the plan, pinned to the data it came from.
+
+        If a future batch grows enough to resolve 15%, this fails and the
+        protocol section that says otherwise has to be rewritten -- which is
+        the intended direction of failure.
+        """
+        path = os.path.join(eval_common.ROOT, "evals", "cost", "results", "raw",
+                            "main-2026-09-18")
+        if not os.path.isdir(path):
+            self.skipTest("baseline batch not present")
+        rows = cost_report.load_records(path)
+        a = cost_resolution.analyse(rows, effect=0.15)
+        self.assertTrue(a["ok"])
+        self.assertFalse(a["resolvable"])
+        self.assertLess(a["power"], 0.5)
+        # Big enough that "just run more" is a budget decision, not a tweak.
+        self.assertGreater(a["required_runs_per_arm"], 20)
+        self.assertGreater(a["false_positive_rate"], 0.10)
 
 
 if __name__ == "__main__":
