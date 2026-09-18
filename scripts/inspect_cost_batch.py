@@ -87,14 +87,21 @@ def classify_failure(result: dict) -> str:
     return "denied" if any(m in low for m in DENIAL_MARKS) else "failed"
 
 
+def events_for(D: str, label: str) -> list[dict]:
+    """One place that opens an event stream, so it can be the one place that
+    closes it. Reading these without a `with` leaked a handle per label per
+    call, which a test run turns into a wall of ResourceWarnings."""
+    with open(os.path.join(D, "events", label + ".jsonl"),
+              encoding="utf-8") as fh:
+        return cost_runner.parse_events(fh.read())
+
+
 def failure_census(D: str, labels: list[str]) -> dict:
     """Refused vs failed, per arm. Asymmetry here is a validity problem."""
     census = {}
     for label in labels:
         arm = "with" if "-with_skill" in label else "without"
-        ev = cost_runner.parse_events(
-            open(os.path.join(D, "events", label + ".jsonl"),
-                 encoding="utf-8").read())
+        ev = events_for(D, label)
         bucket = census.setdefault(arm, {"denied": 0, "failed": 0})
         for r in results(ev):
             if r.get("is_error"):
@@ -115,9 +122,7 @@ def main() -> int:
                     for f in os.listdir(os.path.join(D, "events"))
                     if f.endswith(".jsonl"))
     for label in labels:
-        ev = cost_runner.parse_events(
-            open(os.path.join(D, "events", label + ".jsonl"),
-                 encoding="utf-8").read())
+        ev = events_for(D, label)
         models = {e["message"].get("model")
                   for e in ev
                   if isinstance(e.get("message"), dict)
