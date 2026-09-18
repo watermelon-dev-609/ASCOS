@@ -147,6 +147,23 @@ B 臂额外在 `~/.codex/skills/` 下放 ASCOS 技能包（即 `ai-software-comp
 或改用 `claude -p`（已实测可通，精确 token + 可观测文件读取），
 协议除 CLI/模型外不变。
 
+### 8.1 复测（未修好，且多出一个新故障）
+
+隔日复测 `codex exec --json --ephemeral --skip-git-repo-check "..."`：
+
+| # | 现象 | 含义 |
+|---|---|---|
+| 6 | 60s 超时未返回，**EXIT=124** | 不再是快速失败，而是挂住 |
+| 7 | `failed to refresh available models: timeout waiting for child process to exit` | 中继模型列表仍为空，刷新卡死 |
+| 8 | `Reading additional input from stdin...` | **它在等 stdin**——子进程继承了父进程终端 |
+| 9 | `rmcp::transport::worker: Transport channel closed` | 传输层随后崩掉 |
+
+第 8 条是**独立于 Codex 可用性**的运行器缺陷，已修：`run_one` 现在传
+`stdin=subprocess.DEVNULL`。否则一旦批量跑起来，某一次运行卡在终端上
+会把整批 72 次一起拖死。对应测试 `test_the_child_never_inherits_our_stdin`。
+
+结论没变：Codex 通路仍不可用，且即使修好中继，第 8 条也会先让批量跑挂住。
+
 ---
 
 ## 9. 附：运行器自检（**不是协议数据，已删除**）

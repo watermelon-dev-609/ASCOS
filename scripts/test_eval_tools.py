@@ -7,6 +7,7 @@ and must not need it. Run with `python scripts/test_eval_tools.py`.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -517,8 +518,11 @@ class CostRunnerIOTests(unittest.TestCase):
 
     def _run(self, stdout="", returncode=0, stderr=""):
         case = {"id": "E01", "prompt": "do the thing"}
-        fake = lambda *a, **k: subprocess.CompletedProcess(  # noqa: E731
-            a, returncode, stdout, stderr)
+        self.kwargs = {}
+
+        def fake(*a, **k):
+            self.kwargs = k
+            return subprocess.CompletedProcess(a, returncode, stdout, stderr)
         original = cost_runner.subprocess.run
         cost_runner.subprocess.run = fake
         try:
@@ -541,6 +545,12 @@ class CostRunnerIOTests(unittest.TestCase):
         rec = self._run(returncode=1, stderr="boom")
         self.assertEqual(rec["verdict"], "invalid")
         self.assertIn("boom", rec["note"])
+
+    def test_the_child_never_inherits_our_stdin(self):
+        """`codex exec` reads stdin when it thinks the prompt is missing. One
+        run blocking on a terminal would stall a 72-run batch indefinitely."""
+        self._run(stdout=self.sample)
+        self.assertEqual(self.kwargs.get("stdin"), subprocess.DEVNULL)
 
     def test_a_timeout_is_invalid_without_taking_the_batch_down(self):
         """72 runs is long enough that one hang must not cost the other 71."""
@@ -579,6 +589,98 @@ class CostRunnerIOTests(unittest.TestCase):
         self.assertEqual(by_id["E13"]["bucket"], "large")
         self.assertEqual(by_id["E13"]["workspace"], "empty")
         self.assertTrue(all(c["prompt"] for c in batch))
+
+
+class CostRunnerBatchTests(unittest.TestCase):
+    """`cmd_run` is the entry point for a 72-run spend.
+
+    It has to be exercised before that spend, not during: a crash at record 40
+    would cost the whole batch. The CLI is stubbed so the orchestration is
+    tested without paying for 72 real runs.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.sample = read_text(cost_runner.SAMPLE) if hasattr(
+            cost_runner, "SAMPLE") else read_text(os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "testdata",
+                "claude-sample.jsonl"))
+        self.seen = []
+
+        def fake(cmd, *a, **k):
+            self.seen.append(list(cmd))
+            return subprocess.CompletedProcess(cmd, 0, self.sample, "")
+        self.patcher = unittest.mock.patch.object(cost_runner.subprocess,
+                                                  "run", fake)
+        self.patcher.start()
+        self.addCleanup(self.patcher.stop)
+
+    def _args(self, **kw):
+        import argparse
+        base = dict(manifest=os.path.join(eval_common.ROOT, "evals", "cost",
+                                          "manifest.json"),
+                    case=None, bucket=None, arm=["with_skill", "without_skill"],
+                    runs=1, cli="claude", model=None, out_dir=self.tmp,
+                    timeout=900, bin="x")
+        base.update(kw)
+        return argparse.Namespace(**base)
+
+    def _run_batch(self, args):
+        """cmd_run narrates to stdout; that is useful in a terminal and noise
+        in a test run."""
+        import argparse
+        import contextlib
+        import io
+        assert isinstance(args, argparse.Namespace)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = cost_runner.cmd_run(args)
+        return rc, out.getvalue()
+
+    def _records(self):
+        path = os.path.join(self.tmp, "cost-runs.jsonl")
+        with open(path, encoding="utf-8") as fh:
+            return [json.loads(line) for line in fh if line.strip()]
+
+    def test_one_record_per_case_arm_and_run(self):
+        self.assertEqual(self._run_batch(self._args(case="E01", runs=3))[0], 0)
+        recs = self._records()
+        self.assertEqual(len(recs), 6)
+        self.assertEqual({r["case"] for r in recs}, {"E01"})
+        self.assertEqual(sorted(r["run"] for r in recs), [1, 1, 2, 2, 3, 3])
+
+    def test_bucket_selection_runs_the_whole_bucket(self):
+        self.assertEqual(self._run_batch(self._args(bucket="small"))[0], 0)
+        recs = self._records()
+        self.assertEqual(len(recs), 8)
+        self.assertEqual({r["case"] for r in recs},
+                         {"E01", "E02", "E03", "E04"})
+
+    def test_a_pinned_model_reaches_the_cli_invocation(self):
+        """Comparability depends on the model actually being passed through."""
+        self._run_batch(self._args(case="E01", arm=["without_skill"],
+                           model="haiku"))
+        self.assertTrue(all("--model" in c for c in self.seen))
+        self.assertTrue(all("haiku" in c for c in self.seen))
+
+    def test_no_match_is_an_error_and_writes_nothing(self):
+        import io
+        import contextlib
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = cost_runner.cmd_run(self._args(case="E99"))
+        self.assertEqual(rc, 1)
+        self.assertFalse(os.path.exists(
+            os.path.join(self.tmp, "cost-runs.jsonl")))
+
+    def test_records_survive_a_round_trip_through_the_harness(self):
+        """A batch that the harness rejects is a batch that measured nothing."""
+        self._run_batch(self._args(case="E01", arm=["with_skill"],
+                           model="haiku"))
+        recs = self._records()
+        self.assertTrue(recs)
+        self.assertEqual(eval_harness.cost_errors(recs[0]), [])
 
 
 if __name__ == "__main__":

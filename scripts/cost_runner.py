@@ -234,8 +234,12 @@ def run_one(case: dict, arm: str, run: int, cli: str, model: str | None,
 
     cmd = build_command(cli, case["prompt"], model, resolve_bin(cli, bin_path))
     try:
+        # stdin=DEVNULL matters: `codex exec` reads stdin when it thinks the
+        # prompt is missing, and subprocess inherits ours by default. One run
+        # that blocks on a terminal would stall the whole batch.
         proc = subprocess.run(cmd, cwd=dest, capture_output=True, text=True,
-                              encoding="utf-8", errors="replace", timeout=timeout)
+                              encoding="utf-8", errors="replace",
+                              timeout=timeout, stdin=subprocess.DEVNULL)
     except subprocess.TimeoutExpired as exc:
         # One hung run must not take the batch down with it: 72 runs is long
         # enough that a single timeout would otherwise cost everything before
