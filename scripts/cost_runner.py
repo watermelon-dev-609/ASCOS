@@ -116,11 +116,39 @@ def _skill_invocations(tools: list[dict]) -> list[str]:
                                      if b.get("name") == "Skill") if name})
 
 
+ERROR_MARKS = ("api error", "insufficient", "rate limit", "overloaded",
+               "quota", "unauthorized", " 401", " 402", " 403", " 429", " 500")
+
+
+def _stream_error(events: list[dict]) -> str | None:
+    """The real reason a run produced nothing, read out of the stream itself.
+
+    An exhausted balance came back as exit 1 with empty stderr while the actual
+    message sat in the assistant turn. Without this the note reads "exit 1",
+    which explains nothing and invites re-running a batch that cannot succeed
+    for a reason no amount of retrying will fix.
+    """
+    for e in events:
+        m = e.get("message")
+        if not isinstance(m, dict):
+            continue
+        c = m.get("content")
+        if isinstance(c, list):
+            for b in c:
+                if isinstance(b, dict) and isinstance(b.get("text"), str):
+                    text = b["text"].strip()
+                    if any(mark in text.lower() for mark in ERROR_MARKS):
+                        return text[:160]
+    return None
+
+
 def summarise_claude(events: list[dict]) -> dict:
     """Usage from a `claude -p --output-format stream-json` stream."""
     result = next((e for e in events if e.get("type") == "result"), None)
     if result is None:
-        return {"note": "no result event — the run did not complete"}
+        err = _stream_error(events)
+        return {"note": "no result event — the run did not complete"
+                        + (": " + err if err else "")}
     usage = result.get("usage") or {}
     inc = usage.get("input_tokens")
     out = usage.get("output_tokens")
@@ -128,6 +156,12 @@ def summarise_claude(events: list[dict]) -> dict:
         (inc + out) if isinstance(inc, int) and isinstance(out, int) else None)
     duration = result.get("duration_ms")
     tools = _tool_uses(events)
+    if not total:
+        # A run can exit 0-shaped and still have measured nothing; the reason
+        # is in the stream, not in the exit code.
+        err = _stream_error(events)
+        return {"note": "no token usage in the result event"
+                        + (": " + err if err else "")}
     return {
         "input_tokens": inc,
         "output_tokens": out,

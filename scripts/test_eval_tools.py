@@ -785,6 +785,40 @@ class CostRunnerBatchTests(unittest.TestCase):
         self.assertEqual(eval_harness.cost_errors(recs[0]), [])
 
 
+class RunFailureNoteTests(unittest.TestCase):
+    """A failed run has to say why. "exit 1" says nothing, and a batch that
+    failed for a reason retrying cannot fix gets re-run on that note."""
+
+    def _stream(self, text):
+        return [{"type": "system", "subtype": "init"},
+                {"type": "assistant",
+                 "message": {"content": [{"type": "text", "text": text}]}},
+                {"type": "result", "subtype": "success", "usage": {}}]
+
+    def test_an_exhausted_balance_is_reported_not_hidden_behind_exit_1(self):
+        """Real case: 24 runs returned exit 1 with empty stderr while the
+        reason sat in the assistant turn."""
+        note = cost_runner.summarise_claude(
+            self._stream("API Error: 402 Insufficient Balance"))["note"]
+        self.assertIn("402", note)
+        self.assertIn("Insufficient Balance", note)
+
+    def test_a_run_without_a_result_event_still_carries_the_stream_error(self):
+        events = [{"type": "assistant", "message": {"content": [
+            {"type": "text", "text": "API Error: 429 rate limit"}]}}]
+        self.assertIn("429", cost_runner.summarise_claude(events)["note"])
+
+    def test_a_healthy_stream_is_untouched_by_the_error_scan(self):
+        """The scan must not fire on ordinary prose, or every run looks broken."""
+        events = [{"type": "assistant", "message": {"content": [
+            {"type": "text", "text": "改完了，Home.jsx:9 现在用 t('home.createOrder')。"}]}},
+            {"type": "result", "usage": {"input_tokens": 40000,
+                                         "output_tokens": 5000,
+                                         "total_tokens": 45000}}]
+        self.assertEqual(cost_runner.summarise_claude(events)["total_tokens"],
+                         45000)
+
+
 class FailureClassificationTests(unittest.TestCase):
     """`is_error` covers two different events and counting them together
     misreports both. See protocol §15.1."""
