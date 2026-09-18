@@ -6,20 +6,71 @@
     "note": "Every run gets its own copy: a fixture already modified by an earlier run is no longer the same question. E13 is the exception and runs in an empty directory."
   },
   "cases": [
-    {"id": "E01", "bucket": "small", "workspace": "cost-app"},
-    {"id": "E02", "bucket": "small", "workspace": "cost-app"},
-    {"id": "E03", "bucket": "small", "workspace": "cost-app"},
-    {"id": "E04", "bucket": "small", "workspace": "cost-app"},
-    {"id": "E05", "bucket": "medium", "workspace": "cost-app"},
-    {"id": "E06", "bucket": "medium", "workspace": "cost-app"},
-    {"id": "E07", "bucket": "medium", "workspace": "cost-app"},
-    {"id": "E08", "bucket": "medium", "workspace": "cost-app"},
-    {"id": "E10", "bucket": "large", "workspace": "cost-app"},
-    {"id": "E11", "bucket": "large", "workspace": "cost-app"},
-    {"id": "E12", "bucket": "large", "workspace": "cost-app"},
-    {"id": "E13", "bucket": "large", "workspace": "empty"}
+    {
+      "id": "E01",
+      "bucket": "small",
+      "workspace": "cost-app"
+    },
+    {
+      "id": "E02",
+      "bucket": "small",
+      "workspace": "cost-app"
+    },
+    {
+      "id": "E03",
+      "bucket": "small",
+      "workspace": "cost-app"
+    },
+    {
+      "id": "E04",
+      "bucket": "small",
+      "workspace": "cost-app"
+    },
+    {
+      "id": "E05",
+      "bucket": "medium",
+      "workspace": "cost-app"
+    },
+    {
+      "id": "E06",
+      "bucket": "medium",
+      "workspace": "cost-app"
+    },
+    {
+      "id": "E07",
+      "bucket": "medium",
+      "workspace": "cost-app"
+    },
+    {
+      "id": "E08",
+      "bucket": "medium",
+      "workspace": "cost-app"
+    },
+    {
+      "id": "E10",
+      "bucket": "large",
+      "workspace": "cost-docs"
+    },
+    {
+      "id": "E11",
+      "bucket": "large",
+      "workspace": "cost-app"
+    },
+    {
+      "id": "E12",
+      "bucket": "large",
+      "workspace": "cost-app"
+    },
+    {
+      "id": "E13",
+      "bucket": "large",
+      "workspace": "empty"
+    }
   ],
   "excluded": [
-    {"id": "E09", "reason": "WeChat Pay connector on this host hijacks the request before the skill sees it — an environment contaminant, the same shape as T05 in stage 1, which was recorded invalid and kept out of every denominator."}
+    {
+      "id": "E09",
+      "reason": "WeChat Pay connector on this host hijacks the request before the skill sees it — an environment contaminant, the same shape as T05 in stage 1, which was recorded invalid and kept out of every denominator."
+    }
   ]
 }

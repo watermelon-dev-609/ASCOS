@@ -719,6 +719,28 @@ class CostRunnerBatchTests(unittest.TestCase):
                              "acceptEdits")
             self.assertIn("WebSearch", cmd[cmd.index("--disallowedTools") + 1])
 
+    def test_the_shell_is_opened_only_far_enough_to_verify(self):
+        """A fully closed shell means verification cost is paid and the benefit
+        never arrives. Naming the wrong shell tool is silently ignored, so the
+        spec has to follow the platform."""
+        self._run_batch(self._args(case="E01", arm=["with_skill"]))
+        for cmd in self.seen:
+            specs = [cmd[i + 1] for i, a in enumerate(cmd)
+                     if a == "--allowedTools"]
+            for prefix in cost_runner.SHELL_PREFIXES:
+                self.assertIn("%s(%s:*)" % (cost_runner.SHELL_TOOL, prefix),
+                              specs)
+            # Nothing beyond running and testing code is granted.
+            self.assertNotIn(cost_runner.SHELL_TOOL, specs)
+
+    def test_an_unknown_fixture_is_rejected_loudly(self):
+        """E10 needed its own fixture; a typo in that name would otherwise hand
+        both arms an empty directory and produce a pair that cannot differ."""
+        with self.assertRaises(SystemExit):
+            cost_runner.prepare_workspace(os.path.join(self.tmp, "ws"),
+                                          "no-such-fixture", "with_skill",
+                                          "claude")
+
     def test_no_match_is_an_error_and_writes_nothing(self):
         import io
         import contextlib

@@ -31,7 +31,7 @@ import sys
 
 from eval_common import ROOT, read_text, rel  # noqa: E402
 
-FIXTURE = os.path.join(ROOT, "eval-fixtures", "cost-app")
+FIXTURES = os.path.join(ROOT, "eval-fixtures")
 SKILLS_DIR = os.path.join(ROOT, "skills")
 REFERENCES_DIR = os.path.join(ROOT, "references")
 
@@ -40,6 +40,14 @@ REFERENCES_DIR = os.path.join(ROOT, "references")
 # `without_skill` — the only difference between arms must be discoverability.
 CLI_SKILL_SUBDIR = {"claude": os.path.join(".claude", "skills"),
                     "codex": os.path.join(".codex", "skills")}
+
+# The shell tool is named differently per platform, and a spec against the
+# wrong name is silently ignored rather than rejected.
+SHELL_TOOL = "PowerShell" if os.name == "nt" else "Bash"
+# Only what a run needs in order to verify its own work. Deliberately not the
+# whole shell: the point is to let ASCOS demonstrate its benefit, not to hand
+# out arbitrary command execution.
+SHELL_PREFIXES = ("node", "npm")
 
 
 def parse_events(text: str) -> list[dict]:
@@ -204,7 +212,13 @@ def prepare_workspace(dest: str, workspace: str, arm: str, cli: str) -> None:
     # arms identical for that case, which is a pair of runs that cannot
     # differ and therefore cannot measure anything.
     if workspace != "empty":
-        shutil.copytree(os.path.join(FIXTURE), dest, dirs_exist_ok=True)
+        # Fixture is chosen by name: E10 needs documents to answer questions
+        # over, and cost-app has none, so it gets its own.
+        source = os.path.join(FIXTURES, workspace)
+        if not os.path.isdir(source):
+            raise SystemExit("unknown fixture %r (looked in %s)"
+                             % (workspace, FIXTURES))
+        shutil.copytree(source, dest, dirs_exist_ok=True)
     if arm == "with_skill":
         # Copy the skill package, not the repository. The default output
         # directory lives inside ROOT, so copying ROOT there would copy the
@@ -243,10 +257,20 @@ def build_command(cli: str, prompt: str, model: str | None, bin_path: str) -> li
         # with what is being measured. The pilot hit it on a large case.
         # acceptEdits is the least that lets a run deliver anything: without it
         # every Edit/Write waits for an approval nobody can give, and the batch
-        # measures planning instead of work. Bash stays gated on purpose.
+        # measures planning instead of work.
         cmd = [bin_path, "-p", prompt, "--output-format", "stream-json",
                "--verbose", "--disallowedTools", "WebSearch",
                "--permission-mode", "acceptEdits"]
+        # On top of that, the shell is opened just far enough to run and test
+        # code and no further: ASCOS's verification step writes a script and
+        # executes it, and with the shell fully closed that cost is paid while
+        # the benefit never arrives, which biases the whole batch against it.
+        #
+        # The tool is PowerShell on Windows and Bash elsewhere — verified, not
+        # assumed: every Bash(...) spec was silently a no-op here, which is why
+        # command execution looked completely blocked.
+        for prefix in SHELL_PREFIXES:
+            cmd += ["--allowedTools", "%s(%s:*)" % (SHELL_TOOL, prefix)]
         if model:
             cmd += ["--model", model]
         return cmd
@@ -367,6 +391,31 @@ def case_prompt(case: dict) -> str:
     return _prompt(case)
 
 
+def _read_records(path: str) -> dict:
+    """Existing records keyed on (case, variant, run).
+
+    Keyed rather than appended so re-running one case replaces its record
+    instead of duplicating it, and so driving a batch one case at a time — the
+    natural way to use this — accumulates instead of discarding. Writing the
+    file outright is how the first pilot lost two of its four records.
+    """
+    merged = {}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    old = json.loads(line)
+                    merged[(old["case"], old["variant"], old["run"])] = old
+    return merged
+
+
+def _write_records(path: str, merged: dict) -> None:
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        for key in sorted(merged):
+            fh.write(json.dumps(merged[key], ensure_ascii=False,
+                                sort_keys=True) + "\n")
+
+
 def cmd_run(args) -> int:
     from eval_harness import load_cases
     batch = load_batch(args.manifest, load_cases())
@@ -377,41 +426,36 @@ def cmd_run(args) -> int:
         print("no case matched", file=sys.stderr)
         return 1
 
-    records = []
+    path = os.path.join(args.out_dir, "cost-runs.jsonl")
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    def persist(rec):
+        """Write through after every run.
+
+        A full batch takes hours. Buffering until the end means one
+        interruption discards everything, and the expensive part is the runs,
+        not the writing.
+        """
+        merged = _read_records(path)
+        merged[(rec["case"], rec["variant"], rec["run"])] = rec
+        _write_records(path, merged)
+
+    total = 0
     for case in selected:
         for arm in args.arm:
             for run in range(1, args.runs + 1):
                 rec = run_one(case, arm, run, args.cli, args.model,
                               case["workspace"], args.out_dir, args.timeout,
                               args.bin)
-                records.append(rec)
+                total += 1
+                persist(rec)
                 print("%s %s run%d -> %s | in=%s out=%s tools=%s skills=%s"
                       % (case["id"], arm, run, rec["verdict"],
                          rec["input_tokens"], rec["output_tokens"],
                          rec["tool_calls"], rec["skills_loaded"]))
 
-    os.makedirs(args.out_dir, exist_ok=True)
-    path = os.path.join(args.out_dir, "cost-runs.jsonl")
-    # Merge, never overwrite. Running one case at a time is the natural way to
-    # drive a batch, and overwriting silently discarded the earlier cases —
-    # which is how the pilot lost two of its four records. Keyed on
-    # (case, variant, run) so a re-run of one case replaces it instead of
-    # duplicating it.
-    merged = {}
-    if os.path.exists(path):
-        with open(path, encoding="utf-8") as fh:
-            for line in fh:
-                if line.strip():
-                    old = json.loads(line)
-                    merged[(old["case"], old["variant"], old["run"])] = old
-    for rec in records:
-        merged[(rec["case"], rec["variant"], rec["run"])] = rec
-    with open(path, "w", encoding="utf-8", newline="\n") as fh:
-        for key in sorted(merged):
-            fh.write(json.dumps(merged[key], ensure_ascii=False,
-                                sort_keys=True) + "\n")
     print("\n%d record(s) in %s (%d from this invocation)"
-          % (len(merged), rel(path), len(records)))
+          % (len(_read_records(path)), rel(path), total))
     print("next: python scripts/eval_harness.py ingest --cost --file %s" % rel(path))
     return 0
 
