@@ -422,6 +422,41 @@ class CostRunnerTests(unittest.TestCase):
         self.assertEqual(len(s["files_read"]), 1)
         self.assertIn("theme.js", s["files_read"][0])
 
+    def test_only_real_reads_count_as_loaded(self):
+        """"Loaded" means Read. Write/Edit targets are not loads, and tools like
+        Grep carry `path` rather than `file_path`, which used to put None in the
+        list and make every downstream classifier defend against it."""
+        def event(name, inp):
+            return {"type": "assistant",
+                    "message": {"content": [{"type": "tool_use", "name": name,
+                                             "input": inp}]}}
+        done = {"type": "result", "usage": {"input_tokens": 1,
+                                            "output_tokens": 1},
+                "duration_ms": 1000}
+        s = cost_runner.summarise_claude([
+            event("Read", {"file_path": "/a/references/testing.md"}),
+            event("Write", {"file_path": "/a/references/written.md"}),
+            event("Grep", {"path": "/a/src", "pattern": "x"}),
+            done,
+        ])
+        self.assertEqual(s["files_read"], ["/a/references/testing.md"])
+        self.assertNotIn(None, s["files_read"])
+
+    def test_a_skill_invoked_by_tool_still_counts_as_loaded(self):
+        """The pilot's small case invoked Skill {"skill": "ascos"} and reported
+        no loaded skill, because loading that way produces no file read. That
+        under-reports activation, the one signal this batch is measuring."""
+        events = [
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "name": "Skill",
+                 "input": {"skill": "ascos", "args": "x"}}]}},
+            {"type": "result", "usage": {"input_tokens": 1, "output_tokens": 1},
+             "duration_ms": 1000},
+        ]
+        rec = cost_runner.build_record({"id": "E01"}, "with_skill", 1,
+                                       "claude", events)
+        self.assertEqual(rec["skills_loaded"], ["ascos"])
+
     def test_seconds_are_derived_from_wall_clock(self):
         self.assertEqual(cost_runner.summarise_claude(self.events())["seconds"], 2.4)
 
@@ -673,6 +708,20 @@ class CostRunnerBatchTests(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertFalse(os.path.exists(
             os.path.join(self.tmp, "cost-runs.jsonl")))
+
+    def test_running_a_second_case_does_not_discard_the_first(self):
+        """Driving a batch one case at a time is the natural way to use this.
+        Overwriting the file once silently cost the pilot two of its records."""
+        self._run_batch(self._args(case="E01", arm=["with_skill"]))
+        self._run_batch(self._args(case="E10", arm=["with_skill"]))
+        recs = self._records()
+        self.assertEqual({r["case"] for r in recs}, {"E01", "E10"})
+
+    def test_re_running_a_case_replaces_it_rather_than_duplicating(self):
+        self._run_batch(self._args(case="E01", arm=["with_skill"]))
+        self._run_batch(self._args(case="E01", arm=["with_skill"]))
+        recs = self._records()
+        self.assertEqual(len(recs), 1)
 
     def test_records_survive_a_round_trip_through_the_harness(self):
         """A batch that the harness rejects is a batch that measured nothing."""

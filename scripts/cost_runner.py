@@ -74,6 +74,19 @@ def _tool_uses(events: list[dict]) -> list[dict]:
     return blocks
 
 
+def _skill_invocations(tools: list[dict]) -> list[str]:
+    """Skills the run invoked through the Skill tool.
+
+    Needed because a skill loaded this way never shows up as a file read: the
+    pilot's small case invoked `Skill {"skill": "ascos"}` and still reported an
+    empty `skills_loaded`. Counting only reads makes activation systematically
+    under-reported, which is the one signal this whole batch exists to measure.
+    """
+    return sorted({name for name in ((b.get("input") or {}).get("skill")
+                                     for b in tools
+                                     if b.get("name") == "Skill") if name})
+
+
 def summarise_claude(events: list[dict]) -> dict:
     """Usage from a `claude -p --output-format stream-json` stream."""
     result = next((e for e in events if e.get("type") == "result"), None)
@@ -92,8 +105,13 @@ def summarise_claude(events: list[dict]) -> dict:
         "total_tokens": total,
         "seconds": None if duration is None else round(duration / 1000.0, 2),
         "tool_calls": len(tools),
-        "files_read": [b.get("input", {}).get("file_path")
-                       for b in tools if isinstance(b.get("input"), dict)],
+        # Only real Read calls count as "loaded". Taking every tool input with
+        # a `file_path` also swept in Write/Edit targets, and tools like Grep
+        # use `path` instead, which yielded None entries.
+        "files_read": [path for path in
+                       ((b.get("input") or {}).get("file_path")
+                        for b in tools if b.get("name") == "Read"
+                        and isinstance(b.get("input"), dict)) if path],
     }
 
 
@@ -204,8 +222,11 @@ def resolve_bin(cli: str, override: str | None) -> str:
 
 def build_command(cli: str, prompt: str, model: str | None, bin_path: str) -> list[str]:
     if cli == "claude":
+        # WebSearch is banned: its results change with the calendar, which
+        # makes a run unrepeatable, and it adds tokens that have nothing to do
+        # with what is being measured. The pilot hit it on a large case.
         cmd = [bin_path, "-p", prompt, "--output-format", "stream-json",
-               "--verbose"]
+               "--verbose", "--disallowedTools", "WebSearch"]
         if model:
             cmd += ["--model", model]
         return cmd
@@ -258,14 +279,28 @@ def run_one(case: dict, arm: str, run: int, cli: str, model: str | None,
               encoding="utf-8", newline="\n") as fh:
         fh.write(proc.stdout)
 
+    return build_record(case, arm, run, cli, events, proc.returncode,
+                        proc.stderr)
+
+
+def build_record(case: dict, arm: str, run: int, cli: str, events: list[dict],
+                 returncode: int = 0, stderr: str = "") -> dict:
+    """Turn a captured event stream into a cost record.
+
+    Split out of `run_one` so a stream can be re-summarised without paying for
+    the run again: the raw events are the evidence and the record is only a
+    view over them. Used to recover records after `cmd_run` was fixed to stop
+    overwriting the batch file.
+    """
     summary = SUMMARISERS[cli](events)
     skills, references = classify_paths(summary.get("files_read") or [])
+    skills = sorted(set(skills) | set(_skill_invocations(_tool_uses(events))))
 
     record = {
         "case": case["id"],
         "variant": arm,
         "run": run,
-        "verdict": "pass" if proc.returncode == 0 else "invalid",
+        "verdict": "pass" if returncode == 0 else "invalid",
         "input_tokens": summary.get("input_tokens"),
         "output_tokens": summary.get("output_tokens"),
         "total_tokens": summary.get("total_tokens"),
@@ -274,13 +309,13 @@ def run_one(case: dict, arm: str, run: int, cli: str, model: str | None,
         "skills_loaded": skills,
         "references_loaded": references,
     }
-    if proc.returncode != 0:
+    if returncode != 0:
         # An invalid run has to say why, or "invalid" becomes a drawer to
         # sweep inconvenient results into. Lead with the CLI's own failure:
         # "no result event" is only a consequence, the cause is in stderr, and
         # an audit months later needs to tell auth from rate limit from crash.
-        detail = (proc.stderr or "").strip()[:200]
-        record["note"] = "exit %d" % proc.returncode
+        detail = (stderr or "").strip()[:200]
+        record["note"] = "exit %d" % returncode
         if detail:
             record["note"] += ": " + detail
         if summary.get("note"):
@@ -336,10 +371,26 @@ def cmd_run(args) -> int:
 
     os.makedirs(args.out_dir, exist_ok=True)
     path = os.path.join(args.out_dir, "cost-runs.jsonl")
+    # Merge, never overwrite. Running one case at a time is the natural way to
+    # drive a batch, and overwriting silently discarded the earlier cases —
+    # which is how the pilot lost two of its four records. Keyed on
+    # (case, variant, run) so a re-run of one case replaces it instead of
+    # duplicating it.
+    merged = {}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    old = json.loads(line)
+                    merged[(old["case"], old["variant"], old["run"])] = old
+    for rec in records:
+        merged[(rec["case"], rec["variant"], rec["run"])] = rec
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
-        for rec in records:
-            fh.write(json.dumps(rec, ensure_ascii=False, sort_keys=True) + "\n")
-    print("\nwrote %d record(s) → %s" % (len(records), rel(path)))
+        for key in sorted(merged):
+            fh.write(json.dumps(merged[key], ensure_ascii=False,
+                                sort_keys=True) + "\n")
+    print("\n%d record(s) in %s (%d from this invocation)"
+          % (len(merged), rel(path), len(records)))
     print("next: python scripts/eval_harness.py ingest --cost --file %s" % rel(path))
     return 0
 
