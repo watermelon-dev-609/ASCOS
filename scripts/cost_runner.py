@@ -394,6 +394,11 @@ def build_record(case: dict, arm: str, run: int, cli: str, events: list[dict],
         "tool_calls": summary.get("tool_calls"),
         "skills_loaded": skills,
         "references_loaded": references,
+        # Basenames only. The absolute paths are machine-specific and long,
+        # and what this is for is attribution — which files a run actually
+        # opened, as opposed to which skills it merely declared.
+        "files_read": sorted({os.path.basename(p)
+                              for p in summary.get("files_read") or []}),
     }
     if returncode != 0:
         # An invalid run has to say why, or "invalid" becomes a drawer to

@@ -784,6 +784,18 @@ class CostRunnerBatchTests(unittest.TestCase):
         self.assertTrue(recs)
         self.assertEqual(eval_harness.cost_errors(recs[0]), [])
 
+    def test_what_a_run_read_is_persisted_not_only_computed(self):
+        """skills_loaded says what was declared; files_read says what was
+        actually opened. Lazy-loading gets judged on the second."""
+        self._run_batch(self._args(case="E01", arm=["with_skill"]))
+        for path in self.records:
+            recs = [json.loads(line) for line in
+                    open(path, encoding="utf-8") if line.strip()]
+            for rec in recs:
+                self.assertIn("files_read", rec)
+                self.assertTrue(all("/" not in f and "\\" not in f
+                                    for f in rec["files_read"]))
+
 
 class RunFailureNoteTests(unittest.TestCase):
     """A failed run has to say why. "exit 1" says nothing, and a batch that
