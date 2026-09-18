@@ -1,0 +1,25 @@
+{
+  "stage": "2A",
+  "purpose": "Cost and quality baseline: what ASCOS v1.2.2 costs per size bucket, and whether the spend is worth it. Buckets are declared here rather than inherited from each case's group so a case can sit in a different bucket than its corpus group without editing the case.",
+  "workspace": {
+    "default": "eval-fixtures/cost-app",
+    "note": "Every run gets its own copy: a fixture already modified by an earlier run is no longer the same question. E13 is the exception and runs in an empty directory."
+  },
+  "cases": [
+    {"id": "E01", "bucket": "small", "workspace": "cost-app"},
+    {"id": "E02", "bucket": "small", "workspace": "cost-app"},
+    {"id": "E03", "bucket": "small", "workspace": "cost-app"},
+    {"id": "E04", "bucket": "small", "workspace": "cost-app"},
+    {"id": "E05", "bucket": "medium", "workspace": "cost-app"},
+    {"id": "E06", "bucket": "medium", "workspace": "cost-app"},
+    {"id": "E07", "bucket": "medium", "workspace": "cost-app"},
+    {"id": "E08", "bucket": "medium", "workspace": "cost-app"},
+    {"id": "E10", "bucket": "large", "workspace": "cost-app"},
+    {"id": "E11", "bucket": "large", "workspace": "cost-app"},
+    {"id": "E12", "bucket": "large", "workspace": "cost-app"},
+    {"id": "E13", "bucket": "large", "workspace": "empty"}
+  ],
+  "excluded": [
+    {"id": "E09", "reason": "WeChat Pay connector on this host hijacks the request before the skill sees it — an environment contaminant, the same shape as T05 in stage 1, which was recorded invalid and kept out of every denominator."}
+  ]
+}

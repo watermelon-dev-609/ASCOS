@@ -242,5 +242,151 @@ class VerdictTypeTests(unittest.TestCase):
         self.assertFalse(report.errors)
 
 
+class CostRecordTests(unittest.TestCase):
+    """Stage 2 field contract.
+
+    Written after the cost block was found broken and unrunnable (a stray quote
+    in QUALITY_FLAGS), which is the whole reason this suite exists: an
+    aggregator that has never executed is not a measurement, it is a guess
+    with a command line.
+    """
+
+    CASES = [{"id": "E01", "group": "small", "expect": "pass"},
+             {"id": "E10", "group": "large", "expect": "pass"}]
+
+    def cost_check(self, records, manifest=None):
+        report = eval_common.Report()
+        original = eval_harness.load_cost_records
+        eval_harness.load_cost_records = lambda: records
+        try:
+            eval_harness.cost_records_check(report, self.CASES)
+        finally:
+            eval_harness.load_cost_records = original
+        return report
+
+    def rec(self, **kw):
+        base = {"case": "E01", "variant": "with_skill", "run": 1, "verdict": "pass"}
+        base.update(kw)
+        return base
+
+    # --- the contract accepts what it should ---------------------------
+
+    def test_minimal_record_is_well_formed(self):
+        self.assertEqual(eval_harness.cost_errors(self.rec()), [])
+
+    def test_full_record_is_well_formed(self):
+        self.assertEqual(eval_harness.cost_errors(self.rec(
+            input_tokens=9000, output_tokens=1200, total_tokens=10200,
+            seconds=41.5, tool_calls=7,
+            skills_loaded=["implementation"], references_loaded=["testing.md"],
+            defects={"bugs": 1, "security": 0},
+            over_engineering=False, verified=True, tests_pass=True,
+            stages=[{"stage": "implementation", "tokens": 4000}])), [])
+
+    def test_missing_fields_are_allowed_not_faked(self):
+        """Unmeasured stays absent; the report prints — rather than 0."""
+        self.assertEqual(eval_harness.cost_errors(self.rec(seconds=None)), [])
+
+    # --- reverse verification: broken data must be rejected ------------
+
+    def test_negative_token_count_is_rejected(self):
+        self.assertTrue(eval_harness.cost_errors(self.rec(input_tokens=-1)))
+
+    def test_boolean_is_rejected_as_a_number(self):
+        """bool is a subclass of int, so it must be excluded explicitly."""
+        self.assertTrue(eval_harness.cost_errors(self.rec(tool_calls=True)))
+
+    def test_string_is_rejected_as_a_number(self):
+        self.assertTrue(eval_harness.cost_errors(self.rec(seconds="41")))
+
+    def test_loaded_lists_must_be_lists_of_strings(self):
+        self.assertTrue(eval_harness.cost_errors(self.rec(skills_loaded="implementation")))
+        self.assertTrue(eval_harness.cost_errors(self.rec(references_loaded=[1, 2])))
+
+    def test_unknown_defect_key_is_rejected(self):
+        self.assertTrue(eval_harness.cost_errors(self.rec(defects={"typo": 1})))
+
+    def test_negative_defect_count_is_rejected(self):
+        self.assertTrue(eval_harness.cost_errors(self.rec(defects={"bugs": -1})))
+
+    def test_stage_trace_needs_both_fields(self):
+        self.assertTrue(eval_harness.cost_errors(
+            self.rec(stages=[{"stage": "implementation"}])))
+        self.assertTrue(eval_harness.cost_errors(self.rec(stages=[{"tokens": 1}])))
+
+    def test_checker_surfaces_a_malformed_record_as_an_error(self):
+        report = self.cost_check([self.rec(input_tokens=-5)])
+        self.assertTrue(report.errors)
+
+    def test_checker_rejects_an_unknown_case(self):
+        report = self.cost_check([self.rec(case="E99")])
+        self.assertTrue(report.errors)
+
+    def test_checker_rejects_a_variant_outside_the_three_arms(self):
+        report = self.cost_check([self.rec(variant="with_skill_v3")])
+        self.assertTrue(report.errors)
+
+    # --- quality index -------------------------------------------------
+
+    def test_clean_run_scores_full(self):
+        self.assertEqual(eval_harness.quality_index(self.rec()), 100)
+
+    def test_defects_subtract_their_registered_weight(self):
+        self.assertEqual(eval_harness.quality_index(self.rec(defects={"bugs": 2})), 70)
+        self.assertEqual(eval_harness.quality_index(self.rec(defects={"security": 1})), 75)
+
+    def test_flags_subtract_their_registered_weight(self):
+        self.assertEqual(eval_harness.quality_index(self.rec(over_engineering=True)), 85)
+        self.assertEqual(eval_harness.quality_index(self.rec(verified=False)), 80)
+        self.assertEqual(eval_harness.quality_index(self.rec(tests_pass=False)), 80)
+
+    def test_index_is_clamped_at_zero(self):
+        self.assertEqual(eval_harness.quality_index(self.rec(defects={"security": 10})), 0)
+
+    def test_verdict_is_not_double_counted(self):
+        """A clean but failing run keeps 100: completion is reported beside
+        the index, never inside it."""
+        self.assertEqual(eval_harness.quality_index(self.rec(verdict="fail")), 100)
+
+    # --- aggregation ---------------------------------------------------
+
+    def test_invalid_runs_never_reach_a_mean(self):
+        runs = [self.rec(total_tokens=100, verdict="pass"),
+                self.rec(run=2, total_tokens=9999, verdict="invalid", note="env")]
+        stats = eval_harness._bucket_stats(runs)
+        self.assertEqual(stats["n"], 1)
+        self.assertEqual(stats["invalid"], 1)
+        self.assertEqual(stats["total"], 100)
+
+    def test_bucket_falls_back_to_group_without_a_manifest(self):
+        self.assertEqual(eval_harness.cost_bucket("E10", {"E10": {"group": "large"}}, {}),
+                         "large")
+
+    def test_manifest_overrides_the_group(self):
+        self.assertEqual(
+            eval_harness.cost_bucket("E10", {"E10": {"group": "large"}},
+                                     {"E10": {"bucket": "medium"}}), "medium")
+
+    def test_bucket_is_none_outside_the_cost_buckets(self):
+        self.assertIsNone(eval_harness.cost_bucket("E22", {"E22": {"group": "bugs"}}, {}))
+
+    def test_unstarted_batch_reports_no_coverage_warnings(self):
+        """CI runs `check --strict`, where a warning is a red build.
+
+        Before the first cost record an empty bucket means "not begun", not
+        "missing a bucket" — warning on it would fail the build for a
+        measurement nobody has taken yet.
+        """
+        self.assertEqual(self.cost_check([]).warnings, [])
+
+    def test_started_batch_warns_about_buckets_with_no_runs(self):
+        report = self.cost_check([self.rec(case="E01")])
+        self.assertEqual(len(report.warnings), 2)
+        joined = " ".join(report.warnings)
+        self.assertIn("medium", joined)
+        self.assertIn("large", joined)
+        self.assertNotIn("small", joined)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

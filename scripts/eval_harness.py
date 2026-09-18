@@ -40,11 +40,22 @@ from eval_common import (  # noqa: E402  (script lives next to eval_common)
 RECORDS_FILE = os.path.join(RESULTS_DIR, "records.jsonl")
 REPORT_FILE = os.path.join(RESULTS_DIR, "report.md")
 
+# Stage 2 (cost) keeps its own record file. A cost round ingests ~72 records
+# under a different field contract; pooling them into the Stage 1 file would
+# move the trigger hit rates every time a cost round was ingested.
+COST_DIR = os.path.join(EVALS_DIR, "cost")
+COST_RESULTS_DIR = os.path.join(COST_DIR, "results")
+COST_RECORDS_FILE = os.path.join(COST_RESULTS_DIR, "cost-records.jsonl")
+COST_REPORT_FILE = os.path.join(COST_RESULTS_DIR, "cost-report.md")
+
 BEHAVIOUR_GROUPS = ("small", "medium", "large", "bugs", "adversarial")
 ALL_GROUPS = BEHAVIOUR_GROUPS + ("trigger",)
 SKILLS = ("requirements", "architecture", "implementation",
           "debugging", "code-review", "verification")
-VARIANTS = ("with_skill", "without_skill")
+# `with_skill_candidate` is the v1.3 arm in the Stage 2 A/B/C regression. It is
+# declared from the start so the third arm does not change the schema halfway
+# through the experiment.
+VARIANTS = ("with_skill", "without_skill", "with_skill_candidate")
 # A run that could not measure what the case measures — e.g. an unrelated
 # connector in the harness hijacked the request before ASCOS could see it.
 # Excluded from every denominator: counting it as a miss would blame the
@@ -75,6 +86,23 @@ LOADED = ("yes", "no")
 
 MIN_FIRE = 10  # the corpus must keep 10 must-fire / 10 must-not-fire or it
 MIN_NOT_FIRE = 10  # stops being able to detect either kind of trigger failure
+
+# --- Stage 2: cost & quality ---------------------------------------------
+# Cost is measured, never modelled: every field below is something the run
+# reports, and the aggregator only ever divides sums it was given.
+COST_BUCKETS = ("small", "medium", "large")
+COST_NUMERIC = ("input_tokens", "output_tokens", "total_tokens",
+                "seconds", "tool_calls")
+DEFECT_KEYS = ("bugs", "missed_edges", "security", "unnecessary_changes")
+
+# Weights of the derived quality index. Registered in evals/cost/README.md
+# BEFORE the first cost run — changing them re-bases every round, so they are a
+# constant here rather than a flag. Defect-based only: completion is reported
+# separately so a failing run is not penalised twice.
+QUALITY_MAX = 100
+QUALITY_WEIGHTS = {"bugs": 15, "missed_edges": 10, "security": 25,
+                   "unnecessary_changes": 8}
+QUALITY_FLAGS = {"over_engineering": 15, "not_verified": 20, "tests_fail": 20}
 
 
 # --- corpus ---------------------------------------------------------------
@@ -276,6 +304,222 @@ def _mean(values: list[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
 
+# --- cost records (Stage 2) ----------------------------------------------
+
+def load_cost_records() -> list[dict]:
+    if not os.path.isfile(COST_RECORDS_FILE):
+        return []
+    out = []
+    for line in read_text(COST_RECORDS_FILE).splitlines():
+        line = line.strip()
+        if line:
+            out.append(json.loads(line))
+    return out
+
+
+def write_cost_records(records: list[dict]) -> None:
+    os.makedirs(COST_RESULTS_DIR, exist_ok=True)
+    with open(COST_RECORDS_FILE, "w", encoding="utf-8", newline="\n") as fh:
+        for rec in records:
+            fh.write(json.dumps(rec, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def quality_index(rec: dict) -> int:
+    """Derived composite over observed defects.
+
+    Deliberately excludes the verdict: completion is reported beside this, and
+    counting a failing run twice (once as fail, once as defects) would make the
+    index move for reasons nobody can see.
+    """
+    score = QUALITY_MAX
+    defects = rec.get("defects") or {}
+    for key, weight in QUALITY_WEIGHTS.items():
+        score -= weight * int(defects.get(key, 0) or 0)
+    if rec.get("over_engineering"):
+        score -= QUALITY_FLAGS["over_engineering"]
+    if rec.get("verified") is False:
+        score -= QUALITY_FLAGS["not_verified"]
+    if rec.get("tests_pass") is False:
+        score -= QUALITY_FLAGS["tests_fail"]
+    return max(0, score)
+
+
+def load_manifest(path: str | None = None) -> dict[str, dict]:
+    """Bucket assignment for the cost batch; falls back to each case's group."""
+    path = path or os.path.join(COST_DIR, "manifest.json")
+    if not os.path.isfile(path):
+        return {}
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    return {e["id"]: e for e in data.get("cases", []) if e.get("id")}
+
+
+def cost_bucket(case_id: str, cases: dict, manifest: dict) -> str | None:
+    """Size bucket for a case, or None when it is outside the cost batch."""
+    entry = manifest.get(case_id or "")
+    if entry and entry.get("bucket"):
+        return entry["bucket"]
+    group = cases.get(case_id, {}).get("group")
+    return group if group in COST_BUCKETS else None
+
+
+def cost_errors(rec: dict) -> list[str]:
+    """Field contract for a cost record. Empty list means well formed."""
+    errs = []
+    for field in COST_NUMERIC:
+        value = rec.get(field)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+            errs.append("%s must be a non-negative number, got %r" % (field, value))
+    for field in ("skills_loaded", "references_loaded"):
+        value = rec.get(field)
+        if value is not None and not (isinstance(value, list)
+                                      and all(isinstance(v, str) for v in value)):
+            errs.append("%s must be a list of strings, got %r" % (field, value))
+    defects = rec.get("defects")
+    if defects is not None:
+        if not isinstance(defects, dict):
+            errs.append("defects must be an object, got %r" % defects)
+        else:
+            for key, value in defects.items():
+                if key not in DEFECT_KEYS:
+                    errs.append("unknown defect key %r (allowed: %s)"
+                                % (key, ", ".join(DEFECT_KEYS)))
+                elif isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    errs.append("defects.%s must be a non-negative int, got %r"
+                                % (key, value))
+    for field in ("over_engineering", "verified", "tests_pass"):
+        value = rec.get(field)
+        if value is not None and not isinstance(value, bool):
+            errs.append("%s must be a boolean, got %r" % (field, value))
+    stages = rec.get("stages")
+    if stages is not None:
+        if not isinstance(stages, list):
+            errs.append("stages must be a list, got %r" % stages)
+        else:
+            for stage in stages:
+                if not (isinstance(stage, dict) and stage.get("stage")
+                        and isinstance(stage.get("tokens"), (int, float))
+                        and not isinstance(stage.get("tokens"), bool)):
+                    errs.append("each stage needs {stage, tokens}, got %r" % stage)
+    return errs
+
+
+def cost_records_check(report: Report, cases: list[dict]) -> None:
+    by_id = {c["id"]: c for c in cases if c.get("id")}
+    manifest = load_manifest()
+    records = load_cost_records()
+    seen: set[str] = set()
+    for i, rec in enumerate(records, start=1):
+        label = "cost record #%d" % i
+        report.check(rec.get("case") in by_id, "%s references a known case" % label,
+                     "got %r" % rec.get("case"))
+        report.check(rec.get("variant") in VARIANTS, "%s declares a variant" % label,
+                     "got %r" % rec.get("variant"))
+        run = rec.get("run")
+        report.check(isinstance(run, int) and run >= 1, "%s has run >= 1" % label,
+                     "got %r" % run)
+        for err in cost_errors(rec):
+            report.check(False, "%s is well formed" % label, err)
+        bucket = cost_bucket(rec.get("case"), by_id, manifest)
+        if bucket:
+            seen.add(bucket)
+    # Coverage only carries information once the batch has started. Before the
+    # first record exists an empty bucket means "not begun", not "missing" —
+    # and CI runs this with --strict, so warning there would turn an unstarted
+    # measurement into a red build.
+    if not records:
+        return
+    for bucket in COST_BUCKETS:
+        report.check(bucket in seen, "cost batch covers the %s bucket" % bucket,
+                     "no cost record lands in %s yet" % bucket, level="warn")
+
+
+def _bucket_stats(runs: list[dict]) -> dict:
+    """Aggregate one bucket × variant cell. Invalid runs never reach a mean."""
+    measured = [r for r in runs if r.get("verdict") != INVALID]
+    stats: dict = {"n": len(measured), "invalid": len(runs) - len(measured),
+                   "hits": 0}
+    if not measured:
+        return stats
+    stats["hits"] = sum(1 for r in measured if r.get("verdict") == "pass")
+    for key, field in (("in", "input_tokens"), ("out", "output_tokens"),
+                       ("total", "total_tokens"), ("sec", "seconds"),
+                       ("tools", "tool_calls")):
+        values = [r[field] for r in measured if r.get(field) is not None]
+        stats[key] = _mean(values)
+    stats["qi"] = _mean([quality_index(r) for r in measured])
+    ref_counts = [len(r.get("references_loaded") or [])
+                  for r in measured if r.get("references_loaded") is not None]
+    stats["refs"] = _mean(ref_counts)
+    stats["defects"] = {k: _mean([int((r.get("defects") or {}).get(k, 0) or 0)
+                                  for r in measured]) for k in DEFECT_KEYS}
+    flags = {}
+    for key in ("over_engineering", "verified", "tests_pass"):
+        values = [r[key] for r in measured if isinstance(r.get(key), bool)]
+        flags[key] = (sum(1 for v in values if v) / len(values)) if values else None
+    stats["flags"] = flags
+    return stats
+
+
+def _pct(value: float | None) -> str:
+    return "—" if value is None else "%.0f%%" % (100.0 * value)
+
+
+def _num(value: float | None) -> str:
+    """Token-scale numbers: two decimals there is noise, not precision."""
+    return "—" if value is None else "%.0f" % value
+
+
+def _attribution_section(records: list[dict]) -> list[str]:
+    """Where the tokens actually went (Stage 2C)."""
+    totals: dict[str, float] = {}
+    traced = 0
+    for rec in records:
+        stages = rec.get("stages") or []
+        if stages:
+            traced += 1
+        for stage in stages:
+            totals[stage["stage"]] = totals.get(stage["stage"], 0) + stage["tokens"]
+    if not totals:
+        return []
+    overall = sum(totals.values())
+    out = ["", "## Token attribution", "",
+           "| stage | tokens | share |", "|---|:--:|:--:|"]
+    for stage, tokens in sorted(totals.items(), key=lambda kv: -kv[1]):
+        out.append("| %s | %d | %.0f%% |"
+                   % (stage, tokens, 100.0 * tokens / overall))
+    out += ["", "Only the %d record(s) carrying a `stages` trace contribute; the "
+                "rest are not counted as zero stages, they are simply absent."
+                % traced, ""]
+    return out
+
+
+def _load_frequency_section(grouped: dict) -> list[str]:
+    """What each bucket actually loaded (the lazy-load question in 2E)."""
+    rows: list[tuple[str, str, int]] = []
+    for bucket in COST_BUCKETS:
+        tally: dict[str, int] = {}
+        for runs in (grouped.get(bucket) or {}).values():
+            for rec in runs:
+                for ref in rec.get("references_loaded") or []:
+                    tally[ref] = tally.get(ref, 0) + 1
+        for ref, count in tally.items():
+            rows.append((bucket, ref, count))
+    if not rows:
+        return []
+    out = ["", "## Reference load frequency", "",
+           "A reference showing up under `small` is the 2E question answered "
+           "with counts rather than intuition.", "",
+           "| bucket | reference | loads |", "|---|:--:|:--:|"]
+    for bucket, ref, count in sorted(rows, key=lambda r: (COST_BUCKETS.index(r[0]),
+                                                          -r[2], r[1])):
+        out.append("| %s | %s | %d |" % (bucket, ref, count))
+    out += [""]
+    return out
+
+
 # --- subcommands ----------------------------------------------------------
 
 def cmd_check(args) -> int:
@@ -284,9 +528,11 @@ def cmd_check(args) -> int:
     report.check(bool(cases), "eval corpus is not empty")
     corpus_check(report, cases)
     records_check(report, cases)
+    cost_records_check(report, cases)
 
-    print("ASCOS eval harness — %d checks run (%d cases, %d records)"
-          % (len(report.checks), len(cases), len(load_records())))
+    print("ASCOS eval harness — %d checks run (%d cases, %d records, %d cost records)"
+          % (len(report.checks), len(cases), len(load_records()),
+             len(load_cost_records())))
     for level, msg in report.findings:
         print("  %s %s" % ("✗" if level == "error" else "!", msg))
     if not report.findings:
@@ -343,7 +589,10 @@ def cmd_ingest(args) -> int:
 
     cases = load_cases()
     known = {c["id"]: c for c in cases if c.get("id")}
-    existing = load_records()
+    # Stage 2 records live apart from Stage 1: same shape of file, different
+    # field contract, and pooling them would move the trigger hit rates.
+    sink = COST_RECORDS_FILE if args.cost else RECORDS_FILE
+    existing = load_cost_records() if args.cost else load_records()
     index = {(r.get("case"), r.get("variant"), r.get("run")): i
              for i, r in enumerate(existing)}
 
@@ -379,6 +628,9 @@ def cmd_ingest(args) -> int:
                           % (i, OBSERVATIONS))
         if rec.get("loaded") is not None and rec.get("loaded") not in LOADED:
             errors.append("#%d: loaded must be one of %s" % (i, LOADED))
+        if args.cost:
+            for err in cost_errors(rec):
+                errors.append("#%d: %s" % (i, err))
         key = (rec.get("case"), rec.get("variant"), rec.get("run"))
         if key in index and not args.replace:
             errors.append("#%d: %s run %s already recorded (use --replace)"
@@ -394,9 +646,122 @@ def cmd_ingest(args) -> int:
             existing[index[key]] = rec
         else:
             existing.append(rec)
-    write_records(existing)
+    if args.cost:
+        write_cost_records(existing)
+    else:
+        write_records(existing)
     print("ingested %d record(s) → %s (%d total)"
-          % (len(incoming), rel(RECORDS_FILE), len(existing)))
+          % (len(incoming), rel(sink), len(existing)))
+    return 0
+
+
+def cmd_cost(args) -> int:
+    """Stage 2: what ASCOS costs, and whether the spend was worth it."""
+    cases = {c["id"]: c for c in load_cases() if c.get("id")}
+    manifest = load_manifest(args.manifest)
+    records = load_cost_records()
+    if not records:
+        print("no cost records yet — ingest with `ingest --cost --file <runs.jsonl>`")
+        return 0
+
+    grouped: dict[str, dict[str, list[dict]]] = {}
+    for rec in records:
+        bucket = cost_bucket(rec.get("case"), cases, manifest)
+        if bucket and rec.get("variant") in VARIANTS:
+            grouped.setdefault(bucket, {}).setdefault(rec["variant"], []).append(rec)
+
+    lines = ["# ASCOS Stage 2 — cost report", "",
+             "Generated from `%s` (%d records). Every figure is measured: the "
+             "aggregator only divides sums it was given."
+             % (rel(COST_RECORDS_FILE), len(records)), ""]
+
+    cols = ["bucket", "variant", "runs", "invalid", "completion", "in", "out",
+            "total", "seconds", "tools", "refs", "defects b/e/s/u",
+            "over-eng", "verified", "tests", "QI"]
+    lines += ["## Cost & quality by bucket", "",
+              "`defects b/e/s/u` = bugs / missed edges / security / unnecessary "
+              "changes, per run. `invalid` runs are excluded from every mean.", "",
+              "| " + " | ".join(cols) + " |",
+              "|" + "|".join(":--:" for _ in cols) + "|"]
+    for bucket in COST_BUCKETS:
+        for variant in VARIANTS:
+            runs = (grouped.get(bucket) or {}).get(variant) or []
+            if not runs:
+                continue
+            s = _bucket_stats(runs)
+            if not s["n"]:
+                continue
+            defects = "/".join(_fmt(s["defects"][k]) for k in DEFECT_KEYS)
+            flags = s["flags"]
+            lines.append("| %s | %s | %d | %d | %s | %s | %s | %s | %s | %s | %s "
+                         "| %s | %s | %s | %s | %s |" % (
+                             bucket, variant, s["n"], s["invalid"],
+                             _pct(s["hits"] / s["n"]), _num(s["in"]),
+                             _num(s["out"]), _num(s["total"]), _fmt(s["sec"]),
+                             _fmt(s["tools"]), _fmt(s["refs"]), defects,
+                             _pct(flags["over_engineering"]),
+                             _pct(flags["verified"]), _pct(flags["tests_pass"]),
+                             _fmt(s["qi"])))
+    lines += [""]
+
+    baseline = args.baseline
+    lines += ["## Delta vs `%s`" % baseline, "",
+              "QG/TC = quality gain % ÷ token cost %. Blank when either side is "
+              "unmeasured; `free` when quality rose without spending tokens.", "",
+              "| bucket | variant | Δtokens | ΔQI (pts) | Δquality % | QG/TC |",
+              "|---|:--:|:--:|:--:|:--:|:--:|"]
+    for bucket in COST_BUCKETS:
+        variants = grouped.get(bucket) or {}
+        base = _bucket_stats(variants.get(baseline) or [])
+        if not base["n"]:
+            continue
+        for variant in VARIANTS:
+            if variant == baseline or not variants.get(variant):
+                continue
+            s = _bucket_stats(variants[variant])
+            if not s["n"]:
+                continue
+            tb, tv = base.get("total"), s.get("total")
+            qb, qv = base.get("qi"), s.get("qi")
+            dtok = (100.0 * (tv - tb) / tb) if (tb and tv is not None) else None
+            dpts = (qv - qb) if (qb is not None and qv is not None) else None
+            dq = (100.0 * dpts / qb) if (dpts is not None and qb) else None
+            if dtok is None or dq is None:
+                ratio = "—"
+            elif dtok <= 0:
+                ratio = "free" if dq > 0 else "—"
+            else:
+                ratio = "%.2f" % (dq / dtok)
+            lines.append("| %s | %s | %s | %s | %s | %s |" % (
+                bucket, variant,
+                "—" if dtok is None else "%+.0f%%" % dtok,
+                "—" if dpts is None else "%+.1f" % dpts,
+                "—" if dq is None else "%+.1f%%" % dq, ratio))
+    lines += [""]
+
+    lines += _attribution_section(records)
+    lines += _load_frequency_section(grouped)
+
+    weights = ", ".join("−%d per %s" % (w, k)
+                        for k, w in sorted(QUALITY_WEIGHTS.items()))
+    flags = ", ".join("−%d if %s" % (w, k) for k, w in sorted(QUALITY_FLAGS.items()))
+    lines += ["## Method", "",
+              "QI starts at %d and subtracts: %s; %s. Clamped at 0." % (
+                  QUALITY_MAX, weights, flags),
+              "",
+              "Weights are registered in `evals/cost/README.md` before the first "
+              "run and are not fitted to these results: changing them re-bases "
+              "every round, which is why they are a constant and not a flag.",
+              "",
+              "Completion is reported next to QI, never inside it: a failing run "
+              "should not be penalised twice for the same failure.", ""]
+
+    os.makedirs(COST_RESULTS_DIR, exist_ok=True)
+    with open(COST_REPORT_FILE, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\n".join(lines))
+
+    print("\n".join(lines))
+    print("\nwrote %s" % rel(COST_REPORT_FILE))
     return 0
 
 
@@ -630,7 +995,16 @@ def main() -> int:
     p.add_argument("--file", required=True, help="path to a JSONL run file")
     p.add_argument("--replace", action="store_true",
                    help="overwrite an existing (case, variant, run) triple")
+    p.add_argument("--cost", action="store_true",
+                   help="ingest into the Stage 2 cost record file instead")
     p.set_defaults(func=cmd_ingest)
+
+    p = sub.add_parser("cost", help="Stage 2 cost/quality report")
+    p.add_argument("--baseline", choices=VARIANTS, default="without_skill",
+                   help="variant every delta is measured against")
+    p.add_argument("--manifest",
+                   help="bucket manifest (default: evals/cost/manifest.json)")
+    p.set_defaults(func=cmd_cost)
 
     p = sub.add_parser("report", help="aggregate records into a report")
     p.add_argument("--k", type=int, nargs="+", default=[1, 3],
