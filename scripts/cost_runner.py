@@ -166,6 +166,16 @@ def summarise_claude(events: list[dict]) -> dict:
         "input_tokens": inc,
         "output_tokens": out,
         "total_tokens": total,
+        # total_tokens is input + output only: it does not count the cached
+        # prefix re-read on every turn. On the baseline batch that omitted
+        # ~251k tokens per case against a measured delta of ~11.6k, so a
+        # record without this field is blind to most of the prompt volume
+        # the run actually pushed. Recorded as its own field rather than
+        # folded into total, because the two are billed at different rates
+        # and that rate is not something this repo knows.
+        "cache_read_tokens": usage.get("cache_read_input_tokens"),
+        "num_turns": (result.get("num_turns")
+                      if isinstance(result.get("num_turns"), int) else None),
         "seconds": None if duration is None else round(duration / 1000.0, 2),
         "tool_calls": len(tools),
         # Only real Read calls count as "loaded". Taking every tool input with
@@ -200,6 +210,11 @@ def summarise_codex(events: list[dict]) -> dict:
             "input_tokens": inc,
             "output_tokens": out,
             "total_tokens": total,
+            # Left unmeasured rather than defaulted to 0: Codex's token_count
+            # event has not been observed reporting it, and a 0 here would
+            # read as "no cache traffic" rather than "not reported".
+            "cache_read_tokens": usage.get("cached_input_tokens"),
+            "num_turns": None,
             "seconds": None,
             "tool_calls": None,
             "files_read": [],
@@ -353,6 +368,7 @@ def run_one(case: dict, arm: str, run: int, cli: str, model: str | None,
         return {"case": case["id"], "variant": arm, "run": run,
                 "verdict": "invalid", "input_tokens": None,
                 "output_tokens": None, "total_tokens": None, "seconds": None,
+                "cache_read_tokens": None, "num_turns": None,
                 "tool_calls": None, "skills_loaded": [],
                 "references_loaded": [],
                 "note": "timeout after %ds: %s" % (timeout, _tail(exc.stdout))}
@@ -390,6 +406,8 @@ def build_record(case: dict, arm: str, run: int, cli: str, events: list[dict],
         "input_tokens": summary.get("input_tokens"),
         "output_tokens": summary.get("output_tokens"),
         "total_tokens": summary.get("total_tokens"),
+        "cache_read_tokens": summary.get("cache_read_tokens"),
+        "num_turns": summary.get("num_turns"),
         "seconds": summary.get("seconds"),
         "tool_calls": summary.get("tool_calls"),
         "skills_loaded": skills,
@@ -506,6 +524,50 @@ def cmd_run(args) -> int:
     return 0
 
 
+BACKFILL_FIELDS = ("cache_read_tokens", "num_turns")
+
+
+def cmd_backfill(args) -> int:
+    """Re-derive newly added fields from event streams already on disk.
+
+    When the instrument gains a field, the batches that paid for it are still
+    sitting in events/. Re-running them would cost the money again; leaving
+    them blank makes the new column look like absence of traffic. So the field
+    is recomputed from the raw stream, which is the evidence anyway.
+
+    Deliberately narrow: it writes only BACKFILL_FIELDS. Rebuilding whole
+    records would regenerate `note` from stderr, which is empty for a failed
+    run -- that would overwrite the one line explaining a 402 with "exit 1".
+    """
+    path = os.path.join(args.dir, "cost-runs.jsonl")
+    if not os.path.isfile(path):
+        print("no %s under %s" % ("cost-runs.jsonl", args.dir), file=sys.stderr)
+        return 1
+    events_dir = os.path.join(args.dir, "events")
+    records = _read_records(path)
+    changed = 0
+    for (case, variant, run), rec in records.items():
+        stream = os.path.join(events_dir, "%s-%s-%s.jsonl" % (case, variant, run))
+        if not os.path.isfile(stream):
+            continue
+        with open(stream, encoding="utf-8") as fh:
+            events = parse_events(fh.read())
+        summary = SUMMARISERS[args.cli](events)
+        for field in BACKFILL_FIELDS:
+            value = summary.get(field)
+            if value is None:
+                # Unmeasured stays absent. Writing 0 would read as "no cache
+                # traffic" when it means "not reported".
+                continue
+            if rec.get(field) != value:
+                rec[field] = value
+                changed += 1
+    _write_records(path, records)
+    print("%d record(s), %d field(s) backfilled from %s"
+          % (len(records), changed, rel(events_dir)))
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="command", required=True)
@@ -526,6 +588,11 @@ def main() -> int:
     p.add_argument("--bin", help="path to the CLI executable (auto-detected, "
                                  "including the npm .cmd shim on Windows)")
     p.set_defaults(func=cmd_run)
+
+    p = sub.add_parser("backfill", help="re-derive new fields from saved events")
+    p.add_argument("--dir", required=True, help="batch directory")
+    p.add_argument("--cli", choices=sorted(SUMMARISERS), default="claude")
+    p.set_defaults(func=cmd_backfill)
 
     args = ap.parse_args()
     return args.func(args)

@@ -25,7 +25,12 @@ from eval_common import ROOT  # noqa: E402
 DEFAULT_BATCH = os.path.join(ROOT, "evals", "cost", "results", "raw", "main-2026-09-18")
 RECORDS = "cost-runs.jsonl"
 MIN_VALID = 2
-METRICS = ("input_tokens", "output_tokens", "total_tokens", "tool_calls")
+# cache_read and num_turns are in here because total_tokens alone is blind to
+# most of the prompt volume: on the baseline batch it missed ~251k tokens per
+# case against a measured delta of ~11.6k. Reporting them next to the others
+# is what stops a reader from reading "delta-total" as "the cost".
+METRICS = ("input_tokens", "output_tokens", "total_tokens",
+           "cache_read_tokens", "num_turns", "tool_calls")
 
 
 # --- IO -------------------------------------------------------------------
@@ -126,8 +131,8 @@ def render_markdown(pairs, batch_dir):
     lines.append("每格取**中位数**；`n` 为有效次数；`<%d` 次记为 inconclusive，不进任何分母。"
                  % MIN_VALID)
     lines.append("")
-    lines.append("| 用例 | 激活 | n(with) | n(without) | Δtotal | Δinput | Δoutput | Δ工具 | 结论 |")
-    lines.append("|---|---|---:|---:|---:|---:|---:|---:|---|")
+    lines.append("| 用例 | 激活 | n(with) | n(without) | Δtotal | Δinput | Δcache读 | Δoutput | Δ回合 | Δ工具 | 结论 |")
+    lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|")
     for row in pairs:
         d = row["delta"] or {}
         def v(metric):
@@ -135,12 +140,16 @@ def render_markdown(pairs, batch_dir):
         def n(arm):
             s = row[arm]
             return s["n"] if s else 0
-        lines.append("| %s | %s | %d | %d | %s | %s | %s | %s | %s |" % (
+        lines.append("| %s | %s | %d | %d | %s | %s | %s | %s | %s | %s | %s |" % (
             row["case"], {True: "是", False: "否", None: "—"}[row["activated"]],
             n("with"), n("without"),
             _fmt(v("total_tokens")), _fmt(v("input_tokens")),
-            _fmt(v("output_tokens")), _fmt(v("tool_calls")),
+            _fmt(v("cache_read_tokens")), _fmt(v("output_tokens")),
+            _fmt(v("num_turns")), _fmt(v("tool_calls")),
             row["verdict"]))
+    lines.append("")
+    lines.append("Δtotal = Δinput + Δoutput，**不含缓存读取**。两者费率不同，"
+                 "且本仓库无从得知该费率，故不折算成钱，只并列呈现。")
     lines.append("")
     lines.append("## 原始每次值（不做平滑）")
     lines.append("")

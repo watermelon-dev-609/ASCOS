@@ -92,7 +92,7 @@ MIN_NOT_FIRE = 10  # stops being able to detect either kind of trigger failure
 # reports, and the aggregator only ever divides sums it was given.
 COST_BUCKETS = ("small", "medium", "large")
 COST_NUMERIC = ("input_tokens", "output_tokens", "total_tokens",
-                "seconds", "tool_calls")
+                "cache_read_tokens", "num_turns", "seconds", "tool_calls")
 DEFECT_KEYS = ("bugs", "missed_edges", "security", "unnecessary_changes")
 
 # Weights of the derived quality index. Registered in evals/cost/README.md

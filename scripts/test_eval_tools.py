@@ -7,6 +7,7 @@ and must not need it. Run with `python scripts/test_eval_tools.py`.
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import shutil
@@ -425,6 +426,18 @@ class CostRunnerTests(unittest.TestCase):
         self.assertEqual(s["tool_calls"], 1)
         self.assertEqual(len(s["files_read"]), 1)
         self.assertIn("theme.js", s["files_read"][0])
+
+    def test_the_cached_prefix_is_recorded_and_not_folded_into_total(self):
+        """total_tokens is input + output and excludes the cached prefix that
+        gets re-read every turn. On the baseline batch that omission was ~251k
+        tokens a case against a measured delta of ~11.6k, so a reader taking
+        delta-total for "the cost" would be off by more than an order of
+        magnitude. Kept as its own field because the billing rate is not
+        something this repo can know."""
+        s = cost_runner.summarise_claude(self.events())
+        self.assertEqual(s["cache_read_tokens"], 29568)
+        self.assertEqual(s["num_turns"], 2)
+        self.assertEqual(s["total_tokens"], s["input_tokens"] + s["output_tokens"])
 
     def test_only_real_reads_count_as_loaded(self):
         """"Loaded" means Read. Write/Edit targets are not loads, and tools like
@@ -1084,6 +1097,82 @@ class CostMechanismTests(unittest.TestCase):
         # The realised figure is about a third of it; if it ever approaches
         # 1919, the correction in 19.3 is wrong and must be retracted.
         self.assertLess(t["mean_tokens_per_run"], 1919 * 0.5)
+
+
+class CostBackfillTests(unittest.TestCase):
+    """When the instrument gains a field, the batches that paid for it keep the
+    evidence in events/. Backfill re-derives the field instead of re-running
+    them -- but it must not rebuild the record, because that would regenerate
+    `note` from stderr, which is empty, and replace "402 Insufficient Balance"
+    with "exit 1".
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.events_dir = os.path.join(self.tmp, "events")
+        os.makedirs(self.events_dir)
+        self.sample = read_text(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "testdata",
+            "claude-sample.jsonl"))
+
+    def _record(self, case, variant, run, **extra):
+        rec = {"case": case, "variant": variant, "run": run, "verdict": "pass",
+               "input_tokens": 29952, "output_tokens": 95,
+               "total_tokens": 30047, "tool_calls": 1,
+               "skills_loaded": [], "references_loaded": [], "files_read": []}
+        rec.update(extra)
+        return rec
+
+    def _write(self, records):
+        path = os.path.join(self.tmp, "cost-runs.jsonl")
+        with open(path, "w", encoding="utf-8", newline="\n") as fh:
+            for r in records:
+                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+        return path
+
+    def _read(self):
+        with open(os.path.join(self.tmp, "cost-runs.jsonl"),
+                  encoding="utf-8") as fh:
+            return [json.loads(line) for line in fh if line.strip()]
+
+    def _backfill(self):
+        """cmd_backfill narrates to stdout, which is noise in a test run."""
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):
+            return cost_runner.cmd_backfill(
+                argparse.Namespace(dir=self.tmp, cli="claude"))
+
+    def test_cache_and_turns_are_derived_from_the_saved_stream(self):
+        with open(os.path.join(self.events_dir, "E01-with_skill-1.jsonl"),
+                  "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(self.sample)
+        self._write([self._record("E01", "with_skill", 1)])
+        self.assertEqual(self._backfill(), 0)
+        rec = self._read()[0]
+        self.assertEqual(rec["cache_read_tokens"], 29568)
+        self.assertEqual(rec["num_turns"], 2)
+
+    def test_the_note_that_explains_a_failure_survives(self):
+        """A 402 is the difference between 'retry' and 'stop'. Regenerating the
+        record from an empty stderr would flatten it to 'exit 1'."""
+        with open(os.path.join(self.events_dir, "E01-with_skill-1.jsonl"),
+                  "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(self.sample)
+        self._write([self._record("E01", "with_skill", 1, verdict="invalid",
+                                  note="exit 1 | no token usage in the result "
+                                       "event: API Error: 402 Insufficient "
+                                       "Balance")])
+        self._backfill()
+        self.assertIn("402", self._read()[0]["note"])
+
+    def test_unmeasured_stays_absent_rather_than_zero(self):
+        """A stream that does not report cache traffic must not become a 0,
+        which would read as 'no cache traffic' instead of 'not reported'."""
+        self._write([self._record("E01", "with_skill", 1)])
+        self._backfill()
+        self.assertIsNone(self._read()[0].get("cache_read_tokens"))
 
 
 class CostLoadMixTests(unittest.TestCase):
