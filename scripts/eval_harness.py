@@ -372,6 +372,9 @@ def cost_errors(rec: dict) -> list[str]:
             continue
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
             errs.append("%s must be a non-negative number, got %r" % (field, value))
+    model = rec.get("model")
+    if model is not None and not isinstance(model, str):
+        errs.append("model must be a string, got %r" % model)
     for field in ("skills_loaded", "references_loaded"):
         value = rec.get(field)
         if value is not None and not (isinstance(value, list)

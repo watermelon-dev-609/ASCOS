@@ -74,6 +74,22 @@ def _tool_uses(events: list[dict]) -> list[dict]:
     return blocks
 
 
+def _observed_models(events: list[dict]) -> str | None:
+    """The model theCLI actually served, not the one we asked for.
+
+    Recorded because asking is not the same as getting: `--model haiku` was
+    remapped to `deepseek-v4-flash` by a local relay, and a batch that does not
+    write down which model answered cannot be reproduced. If a run somehow
+    served more than one, all of them are joined so the inconsistency is
+    visible rather than silently averaged away.
+    """
+    seen = sorted({e["message"].get("model")
+                   for e in events
+                   if isinstance(e.get("message"), dict)
+                   and e["message"].get("model")})
+    return ",".join(seen) if seen else None
+
+
 def _skill_invocations(tools: list[dict]) -> list[str]:
     """Skills the run invoked through the Skill tool.
 
@@ -225,8 +241,12 @@ def build_command(cli: str, prompt: str, model: str | None, bin_path: str) -> li
         # WebSearch is banned: its results change with the calendar, which
         # makes a run unrepeatable, and it adds tokens that have nothing to do
         # with what is being measured. The pilot hit it on a large case.
+        # acceptEdits is the least that lets a run deliver anything: without it
+        # every Edit/Write waits for an approval nobody can give, and the batch
+        # measures planning instead of work. Bash stays gated on purpose.
         cmd = [bin_path, "-p", prompt, "--output-format", "stream-json",
-               "--verbose", "--disallowedTools", "WebSearch"]
+               "--verbose", "--disallowedTools", "WebSearch",
+               "--permission-mode", "acceptEdits"]
         if model:
             cmd += ["--model", model]
         return cmd
@@ -300,6 +320,7 @@ def build_record(case: dict, arm: str, run: int, cli: str, events: list[dict],
         "case": case["id"],
         "variant": arm,
         "run": run,
+        "model": _observed_models(events),
         "verdict": "pass" if returncode == 0 else "invalid",
         "input_tokens": summary.get("input_tokens"),
         "output_tokens": summary.get("output_tokens"),

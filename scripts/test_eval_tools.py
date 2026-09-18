@@ -442,6 +442,16 @@ class CostRunnerTests(unittest.TestCase):
         self.assertEqual(s["files_read"], ["/a/references/testing.md"])
         self.assertNotIn(None, s["files_read"])
 
+    def test_the_model_is_what_answered_not_what_was_asked_for(self):
+        """`--model haiku` was silently remapped to another model by a local
+        relay. A record without the observed model cannot be reproduced."""
+        events = [{"type": "assistant",
+                   "message": {"model": "deepseek-v4-flash", "content": []}},
+                  {"type": "result", "usage": {}, "duration_ms": 1}]
+        rec = cost_runner.build_record({"id": "E01"}, "with_skill", 1,
+                                       "claude", events)
+        self.assertEqual(rec["model"], "deepseek-v4-flash")
+
     def test_a_skill_invoked_by_tool_still_counts_as_loaded(self):
         """The pilot's small case invoked Skill {"skill": "ascos"} and reported
         no loaded skill, because loading that way produces no file read. That
@@ -695,9 +705,19 @@ class CostRunnerBatchTests(unittest.TestCase):
     def test_a_pinned_model_reaches_the_cli_invocation(self):
         """Comparability depends on the model actually being passed through."""
         self._run_batch(self._args(case="E01", arm=["without_skill"],
-                           model="haiku"))
+                                   model="haiku"))
         self.assertTrue(all("--model" in c for c in self.seen))
         self.assertTrue(all("haiku" in c for c in self.seen))
+
+    def test_the_batch_runs_with_edits_accepted_and_search_banned(self):
+        """Without acceptEdits every write waits for an approval nobody can
+        give; without banning WebSearch results drift with the calendar."""
+        self._run_batch(self._args(case="E01", arm=["with_skill"]))
+        for cmd in self.seen:
+            self.assertIn("--permission-mode", cmd)
+            self.assertEqual(cmd[cmd.index("--permission-mode") + 1],
+                             "acceptEdits")
+            self.assertIn("WebSearch", cmd[cmd.index("--disallowedTools") + 1])
 
     def test_no_match_is_an_error_and_writes_nothing(self):
         import io
