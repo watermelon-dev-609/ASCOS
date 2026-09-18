@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import eval_common  # noqa: E402
 from eval_common import read_text  # noqa: E402
+import cost_mechanism  # noqa: E402
 import cost_report  # noqa: E402
 import cost_resolution  # noqa: E402
 import cost_runner  # noqa: E402
@@ -996,6 +997,92 @@ class CostResolutionTests(unittest.TestCase):
         # Big enough that "just run more" is a budget decision, not a tweak.
         self.assertGreater(a["required_runs_per_arm"], 20)
         self.assertGreater(a["false_positive_rate"], 0.10)
+
+
+class CostMechanismTests(unittest.TestCase):
+    """The mechanism criterion is only worth its 24 runs if the observable is
+    really a switch: counting it has to be exact, and the token price has to
+    come from the files themselves rather than from a remembered constant.
+    """
+
+    def _rows(self, spec):
+        """spec: {case: [refs_per_run, ...]} -- all with_skill."""
+        rows = []
+        for case, runs in spec.items():
+            for refs in runs:
+                rows.append({"case": case, "variant": "with_skill", "verdict": "ok",
+                             "total_tokens": 1000, "input_tokens": 1000,
+                             "output_tokens": 0, "tool_calls": 1,
+                             "skills_loaded": ["ascos"],
+                             "references_loaded": list(refs), "files_read": []})
+        return rows
+
+    def test_the_token_price_comes_from_the_files_not_a_remembered_constant(self):
+        """§19 priced the three references at 337/660/922 tokens. If a file is
+        edited that number must follow, so it is derived from disk."""
+        for name, expected in (("change-impact.md", 337),
+                               ("context-model.md", 660),
+                               ("non-negotiables.md", 922)):
+            got = cost_mechanism.reference_tokens(name)
+            self.assertIsNotNone(got, "%s is missing from references/" % name)
+            self.assertAlmostEqual(got, expected, delta=max(3, expected * 0.02))
+
+    def test_a_missing_file_is_not_priced_at_zero(self):
+        """Pricing an absent file 0 would quietly under-state the saving."""
+        self.assertIsNone(cost_mechanism.reference_tokens("no-such-file.md"))
+
+    def test_only_the_with_arm_is_counted(self):
+        """The control never loads ASCOS files; counting it would just pad the
+        denominator with zeros and make any rate look smaller."""
+        rows = self._rows({"E01": [["non-negotiables.md"], []]})
+        rows.append({"case": "E01", "variant": "without_skill", "verdict": "ok",
+                     "total_tokens": 1, "input_tokens": 1, "output_tokens": 0,
+                     "tool_calls": 1, "skills_loaded": [],
+                     "references_loaded": [], "files_read": []})
+        table = cost_mechanism.loading_table(rows)
+        self.assertEqual(table["E01"]["runs"], 2)
+        self.assertEqual(table["E01"]["counts"]["non-negotiables.md"], 1)
+
+    def test_the_tail_probabilities_are_the_ones_the_prediction_names(self):
+        """Registered prediction: baseline 8/12, L0 taken -> 0/12. Under the
+        null that is (1/3)^12. The other branch (L1 -> 12/12) uses the upper
+        tail, and both are reported before the data arrives."""
+        p = 8 / 12
+        self.assertAlmostEqual(cost_mechanism.binom_tail_le(0, 12, p),
+                               (1 - p) ** 12, places=12)
+        self.assertAlmostEqual(cost_mechanism.binom_tail_ge(12, 12, p),
+                               p ** 12, places=12)
+        # Sanity: the two tails plus the overlap must cover the space.
+        self.assertGreater(cost_mechanism.binom_tail_le(12, 12, p), 0.999)
+
+    def test_compare_reports_both_branches(self):
+        baseline = self._rows({"E01": [["non-negotiables.md"]] * 2 + [[]]})
+        l0 = self._rows({"E01": [[], [], []]})
+        l1 = self._rows({"E01": [["non-negotiables.md"]] * 3})
+        fell = cost_mechanism.compare(baseline, l0)["per_reference"]["__any__"]
+        rose = cost_mechanism.compare(baseline, l1)["per_reference"]["__any__"]
+        self.assertEqual(fell["baseline"], "2/3")
+        self.assertEqual(fell["new"], "0/3")
+        self.assertLess(fell["p_le"], 0.05)
+        self.assertLess(rose["p_ge"], 0.5)
+
+    def test_the_real_baseline_pins_the_19_3_correction(self):
+        """19.2 predicted 1919 tokens by assuming the three references load on
+        every run. They do not: 8 of 12 runs load any of them, worth ~649
+        tokens a run. If this drifts, 19.3 has to be rewritten with it."""
+        path = os.path.join(eval_common.ROOT, "evals", "cost", "results", "raw",
+                            "main-2026-09-18")
+        if not os.path.isdir(path):
+            self.skipTest("baseline batch not present")
+        t = cost_mechanism.totals(
+            cost_mechanism.loading_table(cost_report.load_records(path)))
+        self.assertEqual(t["runs"], 12)
+        self.assertEqual(t["runs_loading_any"], 8)
+        self.assertAlmostEqual(t["mean_tokens_per_run"], 649, delta=15)
+        # 1919 is what 19.2 predicted by assuming all three load every time.
+        # The realised figure is about a third of it; if it ever approaches
+        # 1919, the correction in 19.3 is wrong and must be retracted.
+        self.assertLess(t["mean_tokens_per_run"], 1919 * 0.5)
 
 
 if __name__ == "__main__":
