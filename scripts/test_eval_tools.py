@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import eval_common  # noqa: E402
 from eval_common import read_text  # noqa: E402
+import cost_load_mix  # noqa: E402
 import cost_mechanism  # noqa: E402
 import cost_report  # noqa: E402
 import cost_resolution  # noqa: E402
@@ -1083,6 +1084,66 @@ class CostMechanismTests(unittest.TestCase):
         # The realised figure is about a third of it; if it ever approaches
         # 1919, the correction in 19.3 is wrong and must be retracted.
         self.assertLess(t["mean_tokens_per_run"], 1919 * 0.5)
+
+
+class CostLoadMixTests(unittest.TestCase):
+    """The tempting shortcut here is pricing every sub-skill on every run. That
+    overstates the static load by ~2.5x, because most runs load the root alone
+    or the root plus two. The finding in §22 depends on counting only what was
+    actually opened.
+    """
+
+    def _rec(self, case, skills, refs=(), arm="with_skill"):
+        return {"case": case, "variant": arm, "verdict": "ok",
+                "total_tokens": 1000, "input_tokens": 1000, "output_tokens": 0,
+                "tool_calls": 1, "skills_loaded": list(skills),
+                "references_loaded": list(refs), "files_read": []}
+
+    def test_only_files_a_run_actually_opened_are_priced(self):
+        """A run that loaded the root alone must not be charged for the five
+        sub-skills it never read."""
+        root = cost_load_mix.price(cost_load_mix.ROOT_SKILL)
+        self.assertIsNotNone(root)
+        r = cost_load_mix.load_mix([self._rec("E01", ["ascos"])])
+        self.assertEqual(r["runs"], 1)
+        self.assertAlmostEqual(r["total"], root, delta=1)
+        self.assertEqual(list(r["mix"]), [cost_load_mix.ROOT_LABEL])
+
+    def test_the_control_arm_is_excluded(self):
+        """The control loads none of these; averaging it in would halve every
+        per-run figure for no reason."""
+        r = cost_load_mix.load_mix([
+            self._rec("E01", ["ascos"]),
+            self._rec("E01", [], arm="without_skill")])
+        self.assertEqual(r["runs"], 1)
+
+    def test_a_missing_file_is_not_priced_at_zero(self):
+        self.assertIsNone(cost_load_mix.price("no-such-file.md"))
+        r = cost_load_mix.load_mix([self._rec("E01", ["not-a-skill"])])
+        self.assertEqual(r["total"], 0)
+
+    def test_the_buckets_partition_the_total(self):
+        r = cost_load_mix.load_mix([
+            self._rec("E01", ["ascos"], ["non-negotiables.md"]),
+            self._rec("E02", ["ascos", "verification"], ["frontend.md"])])
+        s = cost_load_mix.shares(r["mix"])
+        self.assertAlmostEqual(s["skill"] + s["reference"], s["total"], delta=1)
+        self.assertGreater(s["l0_forbidden"], 0)
+        self.assertLess(s["l0_forbidden"], s["reference"])
+
+    def test_the_root_is_the_largest_item_and_dominates_the_static_load(self):
+        """The finding that redirects 2E: lazy-loading references aims at ~19%
+        of the static load, while the entrypoint alone is over half. If a
+        future change shrinks the root, this test has to be updated with §22."""
+        path = os.path.join(eval_common.ROOT, "evals", "cost", "results", "raw",
+                            "main-2026-09-18")
+        if not os.path.isdir(path):
+            self.skipTest("baseline batch not present")
+        r = cost_load_mix.load_mix(cost_report.load_records(path))
+        s = cost_load_mix.shares(r["mix"])
+        self.assertEqual(r["mix"].most_common(1)[0][0], cost_load_mix.ROOT_LABEL)
+        self.assertGreater(s["skill_pct"], 50)
+        self.assertLess(s["l0_forbidden_pct"], 20)
 
 
 if __name__ == "__main__":
