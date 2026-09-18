@@ -14,6 +14,8 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import eval_common  # noqa: E402
+from eval_common import read_text  # noqa: E402
+import cost_runner  # noqa: E402
 import eval_harness  # noqa: E402
 
 def trigger_case(cid, expect):
@@ -386,6 +388,77 @@ class CostRecordTests(unittest.TestCase):
         self.assertIn("medium", joined)
         self.assertIn("large", joined)
         self.assertNotIn("small", joined)
+
+
+class CostRunnerTests(unittest.TestCase):
+    """The runner turns a CLI event stream into a record.
+
+    Sample is a real captured `claude -p --output-format stream-json` run, not
+    a hand-written mock: the point of the parser is that it reads what the CLI
+    actually emits, and a mock would only prove it reads what I imagined.
+    """
+
+    SAMPLE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "testdata", "claude-sample.jsonl")
+
+    def events(self):
+        return cost_runner.parse_events(read_text(self.SAMPLE))
+
+    def test_unparseable_lines_are_skipped_not_fatal(self):
+        events = cost_runner.parse_events("{not json\n\n")
+        self.assertEqual(events, [])
+
+    def test_claude_usage_is_read_from_the_real_stream(self):
+        s = cost_runner.summarise_claude(self.events())
+        self.assertEqual(s["input_tokens"], 29952)
+        self.assertEqual(s["output_tokens"], 95)
+        self.assertEqual(s["total_tokens"], 30047)
+        self.assertEqual(s["tool_calls"], 1)
+        self.assertEqual(len(s["files_read"]), 1)
+        self.assertIn("theme.js", s["files_read"][0])
+
+    def test_seconds_are_derived_from_wall_clock(self):
+        self.assertEqual(cost_runner.summarise_claude(self.events())["seconds"], 2.4)
+
+    def test_an_incomplete_stream_yields_no_numbers(self):
+        """A run that never completed was not measured — it is not zero."""
+        s = cost_runner.summarise_claude([{"type": "assistant"}])
+        self.assertIsNone(s.get("input_tokens"))
+        self.assertIsNone(s.get("total_tokens"))
+        self.assertIn("did not complete", s["note"])
+
+    def test_codex_parser_fails_loudly_instead_of_returning_zeros(self):
+        """No successful Codex run has been observed here, so the parser is
+        unverified. Returning 0 tokens would be a fabricated measurement."""
+        s = cost_runner.summarise_codex([{"type": "turn.started"}])
+        self.assertIsNone(s.get("input_tokens"))
+        self.assertIn("no token usage event", s["note"])
+
+    def test_codex_parser_reads_a_usage_event(self):
+        s = cost_runner.summarise_codex([
+            {"type": "token_count",
+             "info": {"total_token_usage": {"input_tokens": 900,
+                                            "output_tokens": 100}}}])
+        self.assertEqual(s["input_tokens"], 900)
+        self.assertEqual(s["total_tokens"], 1000)
+
+    def test_observed_reads_split_into_skills_and_references(self):
+        skills, refs = cost_runner.classify_paths([
+            "C:/ws/.claude/skills/ascos/skills/implementation/SKILL.md",
+            "C:/ws/.claude/skills/ascos/references/testing.md",
+            "C:/ws/src/theme.js",
+        ])
+        self.assertEqual(skills, ["implementation"])
+        self.assertEqual(refs, ["testing.md"])
+
+    def test_classify_dedupes_and_ignores_junk(self):
+        skills, refs = cost_runner.classify_paths([
+            "C:/ws/.claude/skills/ascos/skills/implementation/SKILL.md",
+            "C:/ws/.claude/skills/ascos/skills/implementation/SKILL.md",
+            None, 42,
+        ])
+        self.assertEqual(skills, ["implementation"])
+        self.assertEqual(refs, [])
 
 
 if __name__ == "__main__":
